@@ -1,0 +1,58 @@
+name: Update Timetable Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          LOGIN_URL: ${{ secrets.LOGIN_URL }}
+          TIMETABLE_URL: ${{ secrets.TIMETABLE_URL }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          USERNAME_FIELD: ${{ secrets.USERNAME_FIELD }}
+          PASSWORD_FIELD: ${{ secrets.PASSWORD_FIELD }}
+          LOGIN_FORM_SELECTOR: ${{ secrets.LOGIN_FORM_SELECTOR }}
+          EXTRA_LOGIN_FORM_JSON: ${{ secrets.EXTRA_LOGIN_FORM_JSON }}
+          TIMETABLE_METHOD: ${{ secrets.TIMETABLE_METHOD }}
+          TIMETABLE_PARAMS_JSON: ${{ secrets.TIMETABLE_PARAMS_JSON }}
+          TIMETABLE_FORM_JSON: ${{ secrets.TIMETABLE_FORM_JSON }}
+          EXTRA_HEADERS_JSON: ${{ secrets.EXTRA_HEADERS_JSON }}
+          SESSION_COOKIES_JSON: ${{ secrets.SESSION_COOKIES_JSON }}
+          REQUEST_TIMEOUT: ${{ secrets.REQUEST_TIMEOUT }}
+          USER_AGENT: ${{ secrets.USER_AGENT }}
+          VERIFY_TLS: ${{ secrets.VERIFY_TLS }}
+          RESPONSE_ENCODING: ${{ secrets.RESPONSE_ENCODING }}
+          OUTPUT_JSON: public/timetable.json
+        run: python -m scraper.run
+
+      - name: Commit if changed
+        run: |
+          git add public/timetable.json
+          if git diff --staged --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update timetable data"
+          git push

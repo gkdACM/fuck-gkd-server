@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>课表展示</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>学校课表</h1>
+      <p id="status" class="status">加载中...</p>
+
+      <section class="toolbar">
+        <input id="searchInput" type="search" placeholder="搜索课程/教师/地点" />
+        <button id="reloadBtn" type="button">刷新数据</button>
+      </section>
+
+      <section id="tableContainer" class="table-wrap"></section>
+    </main>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
