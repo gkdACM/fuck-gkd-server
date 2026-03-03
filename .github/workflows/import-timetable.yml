@@ -1,0 +1,150 @@
+name: Import Timetable Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: 课表 JSON 字符串，或 Base64(JSON)
+        required: true
+        type: string
+      input_format:
+        description: 输入格式
+        required: true
+        type: choice
+        default: auto
+        options:
+          - auto
+          - json
+          - base64
+      commit_changes:
+        description: 是否提交到仓库
+        required: true
+        type: boolean
+        default: true
+      deploy_pages:
+        description: 是否立即部署 GitHub Pages
+        required: true
+        type: boolean
+        default: true
+      commit_message:
+        description: 提交信息
+        required: false
+        type: string
+        default: "data: import timetable via action"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write timetable.json from input
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+          INPUT_FORMAT: ${{ inputs.input_format }}
+        run: |
+          python <<'PY'
+          import base64
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+
+          def parse_json(raw: str):
+              return json.loads(raw)
+
+
+          def parse_base64_json(raw: str):
+              text = raw.strip()
+              remainder = len(text) % 4
+              if remainder:
+                  text += "=" * (4 - remainder)
+              decoded = base64.b64decode(text).decode("utf-8")
+              return json.loads(decoded)
+
+
+          payload = os.environ.get("PAYLOAD", "").strip()
+          input_format = os.environ.get("INPUT_FORMAT", "auto").strip().lower()
+
+          if not payload:
+              raise ValueError("payload 为空")
+
+          if input_format == "json":
+              data = parse_json(payload)
+          elif input_format == "base64":
+              data = parse_base64_json(payload)
+          else:
+              try:
+                  data = parse_json(payload)
+              except Exception:
+                  data = parse_base64_json(payload)
+
+          if not isinstance(data, dict):
+              raise ValueError("payload 解析后必须是 JSON 对象")
+
+          rows = data.get("rows")
+          if not isinstance(rows, list):
+              raise ValueError("payload 必须包含 rows，且 rows 为数组")
+          if rows and not all(isinstance(item, dict) for item in rows):
+              raise ValueError("rows 中每一项必须是对象")
+
+          if "headers" not in data and rows:
+              data["headers"] = list(rows[0].keys())
+
+          if not str(data.get("generated_at", "")).strip():
+              data["generated_at"] = datetime.now(timezone.utc).isoformat()
+
+          if not str(data.get("source", "")).strip():
+              data["source"] = "manual-import-action"
+
+          if "entries" not in data:
+              data["entries"] = []
+
+          output_path = Path("public/timetable.json")
+          output_path.parent.mkdir(parents=True, exist_ok=True)
+          output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+          print(f"wrote {output_path} with {len(rows)} rows")
+          PY
+
+      - name: Commit if changed
+        if: ${{ inputs.commit_changes }}
+        run: |
+          git add public/timetable.json
+          if git diff --staged --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "${{ inputs.commit_message }}"
+          git push
+
+      - name: Setup Pages
+        if: ${{ inputs.deploy_pages }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        if: ${{ inputs.deploy_pages }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        if: ${{ inputs.deploy_pages }}
+        id: deployment
+        uses: actions/deploy-pages@v4

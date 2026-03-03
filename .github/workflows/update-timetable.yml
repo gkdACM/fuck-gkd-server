@@ -27,6 +27,7 @@ jobs:
         env:
           LOGIN_URL: ${{ secrets.LOGIN_URL }}
           TIMETABLE_URL: ${{ secrets.TIMETABLE_URL }}
+          SOURCE_HTML_FILE: ${{ secrets.SOURCE_HTML_FILE }}
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
           USERNAME_FIELD: ${{ secrets.USERNAME_FIELD }}
@@ -43,7 +44,12 @@ jobs:
           VERIFY_TLS: ${{ secrets.VERIFY_TLS }}
           RESPONSE_ENCODING: ${{ secrets.RESPONSE_ENCODING }}
           OUTPUT_JSON: public/timetable.json
-        run: python -m scraper.run
+        run: |
+          if [ -z "${TIMETABLE_URL}" ] && [ -z "${SOURCE_HTML_FILE}" ]; then
+            echo "Skip scraper: TIMETABLE_URL and SOURCE_HTML_FILE are both empty"
+            exit 0
+          fi
+          python -m scraper.run
 
       - name: Commit if changed
         run: |
