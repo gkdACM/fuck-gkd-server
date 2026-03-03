@@ -6,82 +6,224 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
-  background: #f5f7fb;
-  color: #1f2a37;
+  background: #080d14;
+  color: #d5e3f0;
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1360px;
   margin: 0 auto;
   padding: 24px;
 }
 
+.page-header {
+  margin-bottom: 18px;
+}
+
 h1 {
-  margin: 0 0 8px;
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .status {
-  margin: 0 0 20px;
-  color: #4b5563;
+  margin: 8px 0 0;
+  color: #98afc7;
+  font-size: 14px;
 }
 
 .toolbar {
   display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 20px;
 }
 
-input[type="search"] {
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control > span {
+  font-size: 13px;
+  color: #86a0bb;
+}
+
+.grow {
   flex: 1;
-  border: 1px solid #d1d5db;
+}
+
+select,
+input[type="search"] {
+  border: 1px solid #2b3b4f;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
+  color: #d5e3f0;
+  background: #0f1724;
+}
+
+select:focus,
+input[type="search"]:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
 }
 
 button {
   border: none;
   border-radius: 10px;
-  padding: 10px 16px;
-  background: #2563eb;
+  padding: 10px 18px;
+  background: #2b6ceb;
   color: #fff;
   cursor: pointer;
+  font-weight: 600;
 }
 
 button:hover {
-  background: #1d4ed8;
+  background: #2158c5;
 }
 
 .table-wrap {
   overflow: auto;
-  background: #fff;
+  background: #0b1220;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.07);
+  border: 1px solid #203248;
+  box-shadow: 0 8px 30px rgba(3, 10, 24, 0.42);
 }
 
-table {
+.schedule-table,
+.legacy-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 1080px;
 }
 
-th,
-td {
-  border-bottom: 1px solid #e5e7eb;
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 14px;
+.schedule-table thead th,
+.legacy-table thead th {
+  background: #060a10;
+  color: #eef2f7;
+  border: 1px solid #2a3b51;
+  padding: 12px 10px;
+  font-size: 28px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.schedule-table td,
+.schedule-table th,
+.legacy-table td,
+.legacy-table th {
+  border: 1px solid #25374d;
+  font-size: 20px;
   vertical-align: top;
 }
 
-thead {
-  background: #f3f4f6;
+.schedule-table tbody td {
+  background: #10222f;
 }
 
-tr:hover td {
-  background: #fafafa;
+.schedule-table .session-cell {
+  min-width: 96px;
+  text-align: center;
+  font-weight: 700;
+  background: #081019;
+  color: #f4f7fb;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 2px;
+  padding: 10px 8px;
+}
+
+.schedule-table .period-cell {
+  min-width: 78px;
+  text-align: center;
+  font-weight: 700;
+  background: #0c1624;
+  color: #f4f7fb;
+  padding: 10px 8px;
+}
+
+.schedule-table .course-cell {
+  width: 14.28%;
+  min-width: 170px;
+  min-height: 138px;
+  padding: 6px;
+}
+
+.course-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.course-card {
+  border-radius: 9px;
+  border: 1px solid #274963;
+  background: rgba(11, 34, 52, 0.82);
+  padding: 7px 8px;
+  min-height: 110px;
+  line-height: 1.32;
+}
+
+.course-code {
+  color: #f26f6f;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.course-name {
+  color: #8c9cff;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.course-meta {
+  color: #4bb2dc;
+  font-size: 18px;
+}
+
+.course-meta-sub {
+  color: #4ecdc0;
+  font-size: 18px;
+}
+
+.empty-cell {
+  min-height: 110px;
+  border-radius: 9px;
+  border: 1px dashed #27435d;
+  background: rgba(12, 24, 37, 0.6);
+}
+
+.legacy-table th,
+.legacy-table td {
+  padding: 10px 12px;
+}
+
+.legacy-table tbody td {
+  background: #0f1e2c;
+  color: #cbd8e5;
 }
 
 .empty {
-  padding: 16px;
-  color: #6b7280;
+  padding: 18px;
+  color: #93a7bb;
+  font-size: 18px;
+}
+
+@media (max-width: 960px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .control,
+  .grow {
+    width: 100%;
+  }
+
+  button {
+    width: 100%;
+  }
 }

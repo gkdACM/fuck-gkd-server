@@ -51,7 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Write timetable.json from input
+      - name: Write timetable data from input
         env:
           PAYLOAD: ${{ inputs.payload }}
           INPUT_FORMAT: ${{ inputs.input_format }}
@@ -96,35 +96,72 @@ jobs:
           if not isinstance(data, dict):
               raise ValueError("payload 解析后必须是 JSON 对象")
 
-          rows = data.get("rows")
-          if not isinstance(rows, list):
-              raise ValueError("payload 必须包含 rows，且 rows 为数组")
-          if rows and not all(isinstance(item, dict) for item in rows):
-              raise ValueError("rows 中每一项必须是对象")
-
-          if "headers" not in data and rows:
-              data["headers"] = list(rows[0].keys())
-
           if not str(data.get("generated_at", "")).strip():
               data["generated_at"] = datetime.now(timezone.utc).isoformat()
 
           if not str(data.get("source", "")).strip():
               data["source"] = "manual-import-action"
 
-          if "entries" not in data:
-              data["entries"] = []
+          classes = data.get("classes")
+          if isinstance(classes, list):
+              if not classes:
+                  raise ValueError("classes 不能为空数组")
 
-          output_path = Path("public/timetable.json")
+              for index, class_item in enumerate(classes, start=1):
+                  if not isinstance(class_item, dict):
+                      raise ValueError("classes 中每一项必须是对象")
+
+                  if not str(class_item.get("id", "")).strip():
+                      class_item["id"] = f"class-{index}"
+
+                  if not str(class_item.get("name", "")).strip():
+                      class_item["name"] = class_item["id"]
+
+                  slots = class_item.get("slots")
+                  if not isinstance(slots, list):
+                      raise ValueError("每个 class 必须包含 slots 数组")
+
+                  if slots and not all(isinstance(item, dict) for item in slots):
+                      raise ValueError("slots 中每一项必须是对象")
+
+              if "periods" not in data:
+                  data["periods"] = [
+                      {"id": "1-2", "label": "1-2", "session": "上午"},
+                      {"id": "3-4", "label": "3-4", "session": "上午"},
+                      {"id": "5-6", "label": "5-6", "session": "下午"},
+                      {"id": "7-8", "label": "7-8", "session": "下午"},
+                      {"id": "9-11", "label": "9-11", "session": "晚上"},
+                  ]
+
+              output_path = Path("public/timetables.json")
+              row_count = sum(len(item.get("slots", [])) for item in classes)
+              print(f"detected multi-class payload: {len(classes)} classes, {row_count} slots")
+          else:
+              rows = data.get("rows")
+              if not isinstance(rows, list):
+                  raise ValueError("payload 必须包含 rows 数组，或 classes 数组")
+              if rows and not all(isinstance(item, dict) for item in rows):
+                  raise ValueError("rows 中每一项必须是对象")
+
+              if "headers" not in data and rows:
+                  data["headers"] = list(rows[0].keys())
+
+              if "entries" not in data:
+                  data["entries"] = []
+
+              output_path = Path("public/timetable.json")
+              print(f"detected legacy payload: {len(rows)} rows")
+
           output_path.parent.mkdir(parents=True, exist_ok=True)
           output_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
-          print(f"wrote {output_path} with {len(rows)} rows")
+          print(f"wrote {output_path}")
           PY
 
       - name: Commit if changed
         if: ${{ inputs.commit_changes }}
         run: |
-          git add public/timetable.json
+          git add public
           if git diff --staged --quiet; then
             echo "No changes"
             exit 0

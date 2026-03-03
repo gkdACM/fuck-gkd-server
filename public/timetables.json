@@ -1,0 +1,207 @@
+{
+  "generated_at": "2026-03-03T12:00:00+08:00",
+  "source": "manual-sample",
+  "periods": [
+    {
+      "id": "1-2",
+      "label": "1-2",
+      "session": "上午"
+    },
+    {
+      "id": "3-4",
+      "label": "3-4",
+      "session": "上午"
+    },
+    {
+      "id": "5-6",
+      "label": "5-6",
+      "session": "下午"
+    },
+    {
+      "id": "7-8",
+      "label": "7-8",
+      "session": "下午"
+    },
+    {
+      "id": "9-11",
+      "label": "9-11",
+      "session": "晚上"
+    }
+  ],
+  "classes": [
+    {
+      "id": "jy2302b",
+      "name": "计应2302B班",
+      "term": "2025-2026学年春",
+      "slots": [
+        {
+          "day": "星期一",
+          "period": "1-2",
+          "courseCode": "09101344-02",
+          "courseName": "软件测试技术",
+          "location": "文华6号教学楼110",
+          "teacher": "奚相宜",
+          "weeks": "1-18周",
+          "note": "(1-2)"
+        },
+        {
+          "day": "星期二",
+          "period": "1-2",
+          "courseCode": "09101345-02",
+          "courseName": "云计算与虚拟化",
+          "location": "文华6号教学楼107",
+          "teacher": "康茜",
+          "weeks": "1-18周",
+          "note": "(1-2)"
+        },
+        {
+          "day": "星期三",
+          "period": "1-2",
+          "courseCode": "09101345-02",
+          "courseName": "云计算与虚拟化",
+          "location": "文华6号教学楼107",
+          "teacher": "康茜",
+          "weeks": "1-18周",
+          "note": "(1-2)"
+        },
+        {
+          "day": "星期一",
+          "period": "3-4",
+          "courseCode": "09101346-02",
+          "courseName": "信息系统安全",
+          "location": "文华9号实训楼404",
+          "teacher": "路博",
+          "weeks": "1-18周",
+          "note": "(3-4)"
+        },
+        {
+          "day": "星期四",
+          "period": "3-4",
+          "courseCode": "00100321-10",
+          "courseName": "应用文写作",
+          "location": "文华6号教学楼401",
+          "teacher": "张凤芹",
+          "weeks": "1-18周",
+          "note": "(3-4)"
+        },
+        {
+          "day": "星期五",
+          "period": "3-4",
+          "courseCode": "09101344-02",
+          "courseName": "软件测试技术",
+          "location": "文华6号教学楼110",
+          "teacher": "奚相宜",
+          "weeks": "1-9周",
+          "note": "(3-4)"
+        },
+        {
+          "day": "星期三",
+          "period": "5-6",
+          "courseCode": "09101349-02",
+          "courseName": "信创技术二",
+          "location": "文华6号教学楼204",
+          "teacher": "刘昊",
+          "weeks": "1-9周",
+          "note": "(5-10)"
+        },
+        {
+          "day": "星期一",
+          "period": "7-8",
+          "courseCode": "09101347-02",
+          "courseName": "嵌入式技术与应用",
+          "location": "文华9号实训楼402",
+          "teacher": "任佳丽",
+          "weeks": "1-18周",
+          "note": "(7-8)"
+        },
+        {
+          "day": "星期三",
+          "period": "7-8",
+          "courseCode": "09101349-02",
+          "courseName": "信创技术二",
+          "location": "文华6号教学楼204",
+          "teacher": "刘昊",
+          "weeks": "1-9周",
+          "note": "(5-10)"
+        },
+        {
+          "day": "星期一",
+          "period": "9-11",
+          "courseCode": "09101347-02",
+          "courseName": "嵌入式技术与应用",
+          "location": "文华9号实训楼402",
+          "teacher": "任佳丽",
+          "weeks": "1-9周",
+          "note": "(9-10)"
+        },
+        {
+          "day": "星期二",
+          "period": "9-11",
+          "courseCode": "09101346-02",
+          "courseName": "信息系统安全",
+          "location": "文华9号实训楼404",
+          "teacher": "路博",
+          "weeks": "1-9周",
+          "note": "(9-10)"
+        },
+        {
+          "day": "星期三",
+          "period": "9-11",
+          "courseCode": "09101349-02",
+          "courseName": "信创技术二",
+          "location": "文华6号教学楼204",
+          "teacher": "刘昊",
+          "weeks": "1-9周",
+          "note": "(5-10)"
+        }
+      ]
+    },
+    {
+      "id": "jy2302a",
+      "name": "计应2302A班",
+      "term": "2025-2026学年春",
+      "slots": [
+        {
+          "day": "星期一",
+          "period": "1-2",
+          "courseCode": "09101201-01",
+          "courseName": "数据库原理",
+          "location": "文华5号教学楼205",
+          "teacher": "王老师",
+          "weeks": "1-16周",
+          "note": "(1-2)"
+        },
+        {
+          "day": "星期三",
+          "period": "3-4",
+          "courseCode": "09101218-01",
+          "courseName": "Java Web开发",
+          "location": "文华9号实训楼301",
+          "teacher": "陈老师",
+          "weeks": "1-16周",
+          "note": "(3-4)"
+        },
+        {
+          "day": "星期四",
+          "period": "5-6",
+          "courseCode": "00100321-11",
+          "courseName": "应用文写作",
+          "location": "文华6号教学楼402",
+          "teacher": "张凤芹",
+          "weeks": "1-16周",
+          "note": "(5-6)"
+        },
+        {
+          "day": "星期五",
+          "period": "7-8",
+          "courseCode": "09101235-01",
+          "courseName": "Linux运维基础",
+          "location": "文华9号实训楼105",
+          "teacher": "刘老师",
+          "weeks": "1-16周",
+          "note": "(7-8)"
+        }
+      ]
+    }
+  ]
+}

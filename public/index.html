@@ -3,16 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>课表展示</title>
+    <title>班级课表</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="container">
-      <h1>学校课表</h1>
-      <p id="status" class="status">加载中...</p>
+      <header class="page-header">
+        <h1 id="viewTitle">学校课表</h1>
+        <p id="status" class="status">加载中...</p>
+      </header>
 
       <section class="toolbar">
-        <input id="searchInput" type="search" placeholder="搜索课程/教师/地点" />
+        <label class="control">
+          <span>班级</span>
+          <select id="classSelect"></select>
+        </label>
+
+        <label class="control grow">
+          <span>搜索</span>
+          <input id="searchInput" type="search" placeholder="搜索课程/教师/地点/周次" />
+        </label>
+
         <button id="reloadBtn" type="button">刷新数据</button>
       </section>
 

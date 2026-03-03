@@ -2,7 +2,7 @@
 
 这个项目支持两种模式：
 
-- **导入模式（推荐当前使用）**：在 GitHub Actions 手动导入课表 JSON，直接发布网站。
+- **导入模式（推荐当前使用）**：在 GitHub Actions 手动导入课表 JSON，支持多班级切换并直接发布网站。
 - **抓取模式（开学后使用）**：在可访问学校系统的环境抓取并更新 `public/timetable.json`。
 
 ## 1. 先上线展示站点
@@ -11,7 +11,7 @@
 2) 到 `Actions` 页面手动运行 `Deploy Static Site`。  
 3) 等待完成后，工作流日志会显示 Pages 地址。
 
-当前示例数据文件是 `public/timetable.json`，页面会直接读取它并展示。
+当前示例数据文件是 `public/timetables.json`，页面会优先读取并展示“周课表网格 + 班级切换”。
 
 ## 2. 导入模式（Actions 手动导入）
 
@@ -22,7 +22,7 @@
 1) 打开 `Actions -> Import Timetable Data -> 运行工作流程`。
 2) 在 `payload` 粘贴课表数据（JSON 字符串或 Base64(JSON)）。
 3) `input_format` 选 `auto`（默认自动识别）即可。
-4) `commit_changes=true` 会把结果写回 `public/timetable.json` 并推送到仓库。
+4) `commit_changes=true` 会把结果写回 `public/timetables.json`（或兼容写回 `public/timetable.json`）并推送到仓库。
 5) `deploy_pages=true` 会在同一个工作流里直接部署 Pages。
 
 ## 3. payload 最小格式
@@ -31,15 +31,30 @@
 {
   "generated_at": "2026-03-03T00:00:00+00:00",
   "source": "manual",
-  "headers": ["星期", "节次", "课程", "教师", "地点", "周次"],
-  "rows": [
+  "periods": [
+    { "id": "1-2", "label": "1-2", "session": "上午" },
+    { "id": "3-4", "label": "3-4", "session": "上午" },
+    { "id": "5-6", "label": "5-6", "session": "下午" },
+    { "id": "7-8", "label": "7-8", "session": "下午" },
+    { "id": "9-11", "label": "9-11", "session": "晚上" }
+  ],
+  "classes": [
     {
-      "星期": "周一",
-      "节次": "1-2",
-      "课程": "高等数学",
-      "教师": "张老师",
-      "地点": "A101",
-      "周次": "1-16"
+      "id": "jy2302b",
+      "name": "计应2302B班",
+      "term": "2025-2026学年春",
+      "slots": [
+        {
+          "day": "星期一",
+          "period": "1-2",
+          "courseCode": "09101344-02",
+          "courseName": "软件测试技术",
+          "location": "文华6号教学楼110",
+          "teacher": "奚相宜",
+          "weeks": "1-18周",
+          "note": "(1-2)"
+        }
+      ]
     }
   ]
 }
@@ -47,9 +62,14 @@
 
 说明：
 
-- 必须有 `rows`，且 `rows` 是对象数组。
-- `headers` 可省略（工作流会自动按第一行生成）。
+- 推荐使用 `classes` 多班级格式，这样前端可以切换班级。
+- 每个班级都要有 `slots` 数组；每个 `slot` 至少包含 `day`、`period`、`courseName`。
+- `periods` 可省略（工作流会自动补默认节次）。
 - `generated_at` / `source` 可省略（工作流会自动补全）。
+
+兼容说明：
+
+- 仍支持旧格式 `rows`，旧格式会写入 `public/timetable.json`，前端会以旧表格模式渲染。
 
 ## 4. JSON 太长时用 Base64
 
@@ -68,16 +88,23 @@ base64 -w 0 public/timetable.json
 
 把输出结果粘贴到 `payload`，并把 `input_format` 设为 `base64`（或 `auto`）。
 
-## 5. 抓取模式（后续启用）
+## 5. 多班级切换说明
+
+- 页面会优先读取 `public/timetables.json`。
+- 下拉框可切换班级，搜索框会按当前班级过滤课程。
+- 你后续导入更多班级，只需要在 `classes` 数组追加即可。
+
+## 6. 抓取模式（后续启用）
 
 工作流：`.github/workflows/update-timetable.yml`
 
 它适合在能访问学校系统（校园网/VPN/内网机器）的环境使用。  
 如果使用 GitHub 托管 runner 且学校系统是内网地址，抓取会失败，这是正常现象。
 
-## 6. 关键文件
+## 7. 关键文件
 
 - `.github/workflows/import-timetable.yml`：手动导入 + 可选部署
 - `.github/workflows/deploy-pages.yml`：静态站部署
-- `public/timetable.json`：前端读取的数据源
-- `public/app.js`：展示逻辑
+- `public/timetables.json`：多班级周课表数据源（推荐）
+- `public/timetable.json`：旧格式兼容数据源
+- `public/app.js`：展示逻辑（网格视图 + 班级切换）
