@@ -27,6 +27,7 @@ const state = {
   dataset: null,
   legacyData: null,
   currentClassId: "",
+  metaVersion: "",
 };
 
 function formatDate(value) {
@@ -387,14 +388,42 @@ function renderGridView() {
 
   const updateText = formatDate(dataset.generated_at);
   setStatus(
-    `更新时间：${updateText}｜班级数：${dataset.classes.length}｜当前：${classItem.name}`,
+    `更新时间：${updateText}｜班级数：${dataset.classes.length}｜当前：${classItem.name}｜版本：${state.metaVersion || "-"}`,
   );
 }
 
-async function fetchOptionalJson(path) {
-  const response = await fetch(`${path}?ts=${Date.now()}`, {
+async function fetchMeta() {
+  const response = await fetch(`./meta.json?ts=${Date.now()}`, {
     cache: "no-store",
   });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`./meta.json 请求失败: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const version = String(payload.version ?? "").trim();
+  if (!version) {
+    return null;
+  }
+
+  return {
+    ...payload,
+    version,
+  };
+}
+
+async function fetchOptionalJson(path, version = "") {
+  const query = version ? `v=${encodeURIComponent(version)}` : `ts=${Date.now()}`;
+  const response = await fetch(`${path}?${query}`);
 
   if (response.status === 404) {
     return null;
@@ -411,7 +440,16 @@ async function loadTimetable() {
   setStatus("正在加载课表...");
 
   try {
-    const multi = await fetchOptionalJson("./timetables.json");
+    let version = "";
+    try {
+      const meta = await fetchMeta();
+      version = meta ? meta.version : "";
+    } catch (error) {
+      console.warn("load meta.json failed", error);
+    }
+    state.metaVersion = version;
+
+    const multi = await fetchOptionalJson("./timetables.json", version);
     const normalizedMulti = normalizeDataset(multi);
 
     if (normalizedMulti) {
@@ -422,7 +460,7 @@ async function loadTimetable() {
       return;
     }
 
-    const single = await fetchOptionalJson("./timetable.json");
+    const single = await fetchOptionalJson("./timetable.json", version);
     const normalizedSingle = normalizeDataset(single);
 
     if (normalizedSingle) {
@@ -443,7 +481,7 @@ async function loadTimetable() {
 
       const updateText = formatDate(single.generated_at);
       const count = Array.isArray(single.rows) ? single.rows.length : 0;
-      setStatus(`更新时间：${updateText}，共 ${count} 条记录`);
+      setStatus(`更新时间：${updateText}，共 ${count} 条记录｜版本：${state.metaVersion || "-"}`);
       return;
     }
 

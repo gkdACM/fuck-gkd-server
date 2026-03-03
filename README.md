@@ -25,6 +25,11 @@
 4) `commit_changes=true` 会把结果写回 `public/timetables.json`（或兼容写回 `public/timetable.json`）并推送到仓库。
 5) `deploy_pages=true` 会在同一个工作流里直接部署 Pages。
 
+该工作流在写入后会自动执行：
+
+- `python scripts/validate_timetable.py`（结构校验）
+- `python scripts/build_meta.py`（生成 `public/meta.json`）
+
 ## 3. payload 最小格式
 
 ```json
@@ -93,6 +98,7 @@ base64 -w 0 public/timetable.json
 - 页面会优先读取 `public/timetables.json`。
 - 下拉框可切换班级，搜索框会按当前班级过滤课程。
 - 你后续导入更多班级，只需要在 `classes` 数组追加即可。
+- 页面会先读取 `public/meta.json`，再带上 `meta.version` 请求数据文件，降低静态缓存导致的旧数据展示问题。
 
 ## 6. 抓取模式（后续启用）
 
@@ -101,10 +107,20 @@ base64 -w 0 public/timetable.json
 它适合在能访问学校系统（校园网/VPN/内网机器）的环境使用。  
 如果使用 GitHub 托管 runner 且学校系统是内网地址，抓取会失败，这是正常现象。
 
+该工作流在抓取后会执行：
+
+- `python scripts/validate_timetable.py`
+- `python scripts/build_meta.py`
+
+若 `TIMETABLE_URL` 与 `SOURCE_HTML_FILE` 都为空，工作流会直接跳过抓取步骤并结束，不报错。
+
 ## 7. 关键文件
 
 - `.github/workflows/import-timetable.yml`：手动导入 + 可选部署
 - `.github/workflows/deploy-pages.yml`：静态站部署
 - `public/timetables.json`：多班级周课表数据源（推荐）
 - `public/timetable.json`：旧格式兼容数据源
+- `public/meta.json`：前端缓存版本与数据摘要
 - `public/app.js`：展示逻辑（网格视图 + 班级切换）
+- `scripts/validate_timetable.py`：课表 JSON 校验脚本
+- `scripts/build_meta.py`：生成 `meta.json` 脚本

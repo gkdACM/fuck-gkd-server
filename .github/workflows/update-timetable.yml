@@ -51,9 +51,15 @@ jobs:
           fi
           python -m scraper.run
 
+      - name: Validate timetable data
+        run: python scripts/validate_timetable.py
+
+      - name: Build meta information
+        run: python scripts/build_meta.py
+
       - name: Commit if changed
         run: |
-          git add public/timetable.json
+          git add public/timetable.json public/meta.json
           if git diff --staged --quiet; then
             echo "No changes"
             exit 0

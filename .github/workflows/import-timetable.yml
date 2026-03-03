@@ -158,6 +158,12 @@ jobs:
           print(f"wrote {output_path}")
           PY
 
+      - name: Validate timetable data
+        run: python scripts/validate_timetable.py
+
+      - name: Build meta information
+        run: python scripts/build_meta.py
+
       - name: Commit if changed
         if: ${{ inputs.commit_changes }}
         run: |

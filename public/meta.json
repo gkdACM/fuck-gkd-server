@@ -1,0 +1,29 @@
+{
+  "version": "6f9a5f2130a6e370",
+  "summary": {
+    "file_count": 2,
+    "class_count": 3,
+    "record_count": 17
+  },
+  "sources": [
+    {
+      "path": "public/timetables.json",
+      "mode": "multi",
+      "class_count": 2,
+      "record_count": 16,
+      "sha256": "0664ab8a934222ffc9848231f9df1b8f4e76feebff0e1e37211a28c6976b7558",
+      "generated_at": "2026-03-03T12:00:00+08:00",
+      "source": "manual-sample"
+    },
+    {
+      "path": "public/timetable.json",
+      "mode": "legacy",
+      "class_count": 1,
+      "record_count": 1,
+      "sha256": "2bd214ba2d07de6e69ff4d23c5b12bdee53b9f96472dae9e59f916854819ac0f",
+      "generated_at": "2026-03-03T00:00:00+00:00",
+      "source": "manual"
+    }
+  ],
+  "latest_generated_at": "2026-03-03T12:00:00+08:00"
+}
