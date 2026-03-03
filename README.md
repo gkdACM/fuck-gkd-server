@@ -41,16 +41,16 @@
   "classes": [
     {
       "id": "jy2302b",
-      "name": "计应2302B班",
-      "term": "2025-2026学年春",
+      "name": "计应2*0**班",
+      "term": "20**-20**学年春",
       "slots": [
         {
           "day": "星期一",
           "period": "1-2",
           "courseCode": "09101344-02",
           "courseName": "软件测试技术",
-          "location": "文华6号教学楼110",
-          "teacher": "奚相宜",
+          "location": "文华*号教学楼***",
+          "teacher": "奚老师",
           "weeks": "1-18周",
           "note": "(1-2)"
         }
