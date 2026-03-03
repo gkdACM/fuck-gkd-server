@@ -1,5 +1,5 @@
 {
-  "version": "6f9a5f2130a6e370",
+  "version": "77f465dc1587e01f",
   "summary": {
     "file_count": 2,
     "class_count": 3,
@@ -11,7 +11,7 @@
       "mode": "multi",
       "class_count": 2,
       "record_count": 16,
-      "sha256": "0664ab8a934222ffc9848231f9df1b8f4e76feebff0e1e37211a28c6976b7558",
+      "sha256": "2d1f154d47110e37b28827135cf5d3da5308403ef8ff4e7b2a28e08f9427894c",
       "generated_at": "2026-03-03T12:00:00+08:00",
       "source": "manual-sample"
     },
@@ -20,7 +20,7 @@
       "mode": "legacy",
       "class_count": 1,
       "record_count": 1,
-      "sha256": "2bd214ba2d07de6e69ff4d23c5b12bdee53b9f96472dae9e59f916854819ac0f",
+      "sha256": "e4f0eac6b2286bc93c532204afca7598a30edfa0cdd1e7d0b69736639434fcd3",
       "generated_at": "2026-03-03T00:00:00+00:00",
       "source": "manual"
     }
