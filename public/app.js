@@ -23,6 +23,8 @@ const detailModalBackdrop = document.getElementById("detailModalBackdrop");
 const detailModalClose = document.getElementById("detailModalClose");
 const detailModalBody = document.getElementById("detailModalBody");
 const detailModalTitle = document.getElementById("detailModalTitle");
+const toastContainer = document.getElementById("toast-container");
+const loadingOverlay = document.getElementById("loading-overlay");
 
 const DAYS = [
   "星期一",
@@ -129,6 +131,34 @@ function formatDate(value) {
 function setStatus(text, isError = false) {
   statusNode.textContent = text;
   statusNode.style.color = isError ? "#ff8c8c" : "#98afc7";
+  if (isError) {
+    showToast(text, "error");
+  }
+}
+
+function showToast(message, type = "info") {
+  if (!toastContainer) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+  
+  toastContainer.appendChild(toast);
+  
+  // Auto remove after 3s
+  setTimeout(() => {
+    toast.style.animation = "fadeOut 0.3s forwards";
+    toast.addEventListener("animationend", () => {
+      toast.remove();
+    });
+  }, 3000);
+}
+
+function showLoading() {
+  if (loadingOverlay) loadingOverlay.classList.add("visible");
+}
+
+function hideLoading() {
+  if (loadingOverlay) loadingOverlay.classList.remove("visible");
 }
 
 function escapeHtml(value) {
@@ -1256,6 +1286,7 @@ function exportCurrentCsv() {
   const fileName = `${classItem.name.replaceAll(/\s+/g, "_")}_课表.csv`;
   downloadFile(`\uFEFF${lines.join("\n")}`, fileName, "text/csv;charset=utf-8");
   setStatus(`已导出 CSV：${rows.length} 条`, false);
+  showToast(`已导出 CSV：${rows.length} 条`, "success");
 }
 
 function formatIcsDateTime(date) {
@@ -1366,6 +1397,7 @@ function exportCurrentIcs() {
   const fileName = `${classItem.name.replaceAll(/\s+/g, "_")}_课表.ics`;
   downloadFile(lines.join("\r\n"), fileName, "text/calendar;charset=utf-8");
   setStatus(`已导出 ICS：${eventCount} 个日程`, false);
+  showToast(`已导出 ICS：${eventCount} 个日程`, "success");
 }
 
 function renderDetailItems(items) {
@@ -1448,6 +1480,7 @@ async function fetchOptionalJson(path, version = "") {
 }
 
 async function loadTimetable() {
+  showLoading();
   setStatus("正在加载课表...");
 
   try {
@@ -1463,6 +1496,38 @@ async function loadTimetable() {
     }
     state.metaVersion = version;
 
+    // Try to load from cache
+    const CACHE_KEY_DATA = "timetable_data";
+    const CACHE_KEY_VERSION = "timetable_version";
+    
+    if (version) {
+      const cachedVersion = localStorage.getItem(CACHE_KEY_VERSION);
+      const cachedDataStr = localStorage.getItem(CACHE_KEY_DATA);
+      
+      if (cachedVersion === version && cachedDataStr) {
+        try {
+          const cachedRaw = JSON.parse(cachedDataStr);
+          const normalized = normalizeDataset(cachedRaw);
+          if (normalized) {
+            state.dataset = normalized;
+            state.legacyData = null;
+            if (!state.termStartDate && normalized.term_start_date) {
+              state.termStartDate = normalized.term_start_date;
+            }
+            renderClassOptions(normalized);
+            renderWeekNumberOptions(normalized);
+            renderGridView();
+            scheduleHashSync();
+            setStatus(`已加载本地缓存 (v${version})`);
+            hideLoading();
+            return;
+          }
+        } catch (e) {
+          console.warn("Cache parse failed", e);
+        }
+      }
+    }
+
     const multi = await fetchOptionalJson("./timetables.json", version);
     const normalizedMulti = normalizeDataset(multi);
 
@@ -1472,10 +1537,22 @@ async function loadTimetable() {
       if (!state.termStartDate && normalizedMulti.term_start_date) {
         state.termStartDate = normalizedMulti.term_start_date;
       }
+      
+      // Save to cache
+      if (version) {
+        try {
+          localStorage.setItem(CACHE_KEY_VERSION, version);
+          localStorage.setItem(CACHE_KEY_DATA, JSON.stringify(multi));
+        } catch (e) {
+          console.warn("Cache save failed (quota exceeded?)", e);
+        }
+      }
+
       renderClassOptions(normalizedMulti);
       renderWeekNumberOptions(normalizedMulti);
       renderGridView();
       scheduleHashSync();
+      hideLoading();
       return;
     }
 
@@ -1488,10 +1565,22 @@ async function loadTimetable() {
       if (!state.termStartDate && normalizedSingle.term_start_date) {
         state.termStartDate = normalizedSingle.term_start_date;
       }
+
+      // Save to cache
+      if (version) {
+        try {
+          localStorage.setItem(CACHE_KEY_VERSION, version);
+          localStorage.setItem(CACHE_KEY_DATA, JSON.stringify(single));
+        } catch (e) {
+          console.warn("Cache save failed", e);
+        }
+      }
+
       renderClassOptions(normalizedSingle);
       renderWeekNumberOptions(normalizedSingle);
       renderGridView();
       scheduleHashSync();
+      hideLoading();
       return;
     }
 
@@ -1506,6 +1595,7 @@ async function loadTimetable() {
       const updateText = formatDate(single.generated_at);
       const count = Array.isArray(single.rows) ? single.rows.length : 0;
       setStatus(`更新时间：${updateText}，共 ${count} 条记录｜版本：${state.metaVersion || "-"}`);
+      hideLoading();
       return;
     }
 
@@ -1513,6 +1603,7 @@ async function loadTimetable() {
   } catch (error) {
     setStatus(`加载失败：${error.message}`, true);
     tableContainer.innerHTML = '<div class="empty">无法加载课表数据</div>';
+    hideLoading();
   }
 }
 
