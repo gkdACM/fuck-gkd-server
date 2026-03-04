@@ -6,14 +6,14 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
-  background: #080d14;
-  color: #d5e3f0;
+  background: radial-gradient(circle at top, #101b2d 0%, #080d14 55%);
+  color: #d7e5f3;
 }
 
 .container {
   max-width: 1360px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 22px;
 }
 
 .page-header {
@@ -22,7 +22,7 @@ body {
 
 h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -30,7 +30,7 @@ h1 {
 .status {
   margin: 8px 0 0;
   color: #98afc7;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .toolbar {
@@ -38,6 +38,11 @@ h1 {
   align-items: end;
   gap: 14px;
   margin-bottom: 20px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid #22364e;
+  background: rgba(10, 20, 34, 0.78);
+  backdrop-filter: blur(4px);
 }
 
 .control {
@@ -47,7 +52,7 @@ h1 {
 }
 
 .control > span {
-  font-size: 13px;
+  font-size: 12px;
   color: #86a0bb;
 }
 
@@ -58,9 +63,9 @@ h1 {
 select,
 input[type="search"] {
   border: 1px solid #2b3b4f;
-  border-radius: 10px;
+  border-radius: 9px;
   padding: 10px 12px;
-  font-size: 14px;
+  font-size: 13px;
   color: #d5e3f0;
   background: #0f1724;
 }
@@ -74,8 +79,8 @@ input[type="search"]:focus {
 
 button {
   border: none;
-  border-radius: 10px;
-  padding: 10px 18px;
+  border-radius: 9px;
+  padding: 10px 16px;
   background: #2b6ceb;
   color: #fff;
   cursor: pointer;
@@ -91,7 +96,7 @@ button:hover {
   background: #0b1220;
   border-radius: 12px;
   border: 1px solid #203248;
-  box-shadow: 0 8px 30px rgba(3, 10, 24, 0.42);
+  box-shadow: 0 10px 30px rgba(3, 10, 24, 0.42);
 }
 
 .schedule-table,
@@ -106,10 +111,13 @@ button:hover {
   background: #060a10;
   color: #eef2f7;
   border: 1px solid #2a3b51;
-  padding: 12px 10px;
-  font-size: 28px;
+  padding: 10px 8px;
+  font-size: 14px;
   text-align: center;
   font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .schedule-table td,
@@ -117,7 +125,7 @@ button:hover {
 .legacy-table td,
 .legacy-table th {
   border: 1px solid #25374d;
-  font-size: 20px;
+  font-size: 13px;
   vertical-align: top;
 }
 
@@ -126,31 +134,32 @@ button:hover {
 }
 
 .schedule-table .session-cell {
-  min-width: 96px;
+  min-width: 74px;
   text-align: center;
   font-weight: 700;
   background: #081019;
   color: #f4f7fb;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  letter-spacing: 2px;
-  padding: 10px 8px;
+  letter-spacing: 1px;
+  padding: 8px 6px;
 }
 
 .schedule-table .period-cell {
-  min-width: 78px;
+  min-width: 62px;
   text-align: center;
   font-weight: 700;
   background: #0c1624;
-  color: #f4f7fb;
-  padding: 10px 8px;
+  color: #d9e6f3;
+  padding: 8px 6px;
 }
 
 .schedule-table .course-cell {
   width: 14.28%;
-  min-width: 170px;
-  min-height: 138px;
+  min-width: 156px;
+  min-height: 104px;
   padding: 6px;
+  background: linear-gradient(180deg, #102332 0%, #0f202f 100%);
 }
 
 .course-stack {
@@ -160,46 +169,49 @@ button:hover {
 }
 
 .course-card {
-  border-radius: 9px;
-  border: 1px solid #274963;
-  background: rgba(11, 34, 52, 0.82);
-  padding: 7px 8px;
-  min-height: 110px;
+  border-radius: 10px;
+  border: 1px solid #2a516f;
+  background: rgba(13, 39, 60, 0.8);
+  padding: 8px;
+  min-height: 88px;
   line-height: 1.32;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .course-code {
-  color: #f26f6f;
-  font-size: 18px;
+  color: #f5968a;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 .course-name {
-  color: #8c9cff;
-  font-size: 22px;
+  color: #9cb3ff;
+  font-size: 15px;
   font-weight: 700;
+  margin: 2px 0 3px;
 }
 
 .course-meta {
-  color: #4bb2dc;
-  font-size: 18px;
+  color: #66c6ea;
+  font-size: 12px;
 }
 
 .course-meta-sub {
-  color: #4ecdc0;
-  font-size: 18px;
+  color: #71d6ca;
+  font-size: 12px;
 }
 
 .empty-cell {
-  min-height: 110px;
-  border-radius: 9px;
+  min-height: 88px;
+  border-radius: 10px;
   border: 1px dashed #27435d;
-  background: rgba(12, 24, 37, 0.6);
+  background: rgba(12, 24, 37, 0.46);
 }
 
 .legacy-table th,
 .legacy-table td {
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .legacy-table tbody td {
@@ -210,7 +222,7 @@ button:hover {
 .empty {
   padding: 18px;
   color: #93a7bb;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 @media (max-width: 960px) {
