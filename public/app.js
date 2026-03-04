@@ -9,8 +9,20 @@ const majorSelect = document.getElementById("majorSelect");
 const directionSelect = document.getElementById("directionSelect");
 const classFilterInput = document.getElementById("classFilterInput");
 const weekFilterInput = document.getElementById("weekFilterInput");
+const weekNumberSelect = document.getElementById("weekNumberSelect");
 const weekModeSelect = document.getElementById("weekModeSelect");
+const compactToggle = document.getElementById("compactToggle");
+const exportCsvBtn = document.getElementById("exportCsvBtn");
+const enableIcsToggle = document.getElementById("enableIcsToggle");
+const termStartInput = document.getElementById("termStartInput");
+const exportIcsBtn = document.getElementById("exportIcsBtn");
 const reloadButton = document.getElementById("reloadBtn");
+
+const detailModal = document.getElementById("detailModal");
+const detailModalBackdrop = document.getElementById("detailModalBackdrop");
+const detailModalClose = document.getElementById("detailModalClose");
+const detailModalBody = document.getElementById("detailModalBody");
+const detailModalTitle = document.getElementById("detailModalTitle");
 
 const DAYS = [
   "星期一",
@@ -22,6 +34,16 @@ const DAYS = [
   "星期日",
 ];
 
+const DAY_INDEX = {
+  星期一: 0,
+  星期二: 1,
+  星期三: 2,
+  星期四: 3,
+  星期五: 4,
+  星期六: 5,
+  星期日: 6,
+};
+
 const DEFAULT_PERIODS = [
   { id: "1-2", label: "1-2", session: "上午" },
   { id: "3-4", label: "3-4", session: "上午" },
@@ -29,6 +51,14 @@ const DEFAULT_PERIODS = [
   { id: "7-8", label: "7-8", session: "下午" },
   { id: "9-11", label: "9-11", session: "晚上" },
 ];
+
+const PERIOD_TIME_RANGE = {
+  "1-2": { start: "08:00", end: "09:35" },
+  "3-4": { start: "10:00", end: "11:35" },
+  "5-6": { start: "14:00", end: "15:35" },
+  "7-8": { start: "16:00", end: "17:35" },
+  "9-11": { start: "19:00", end: "21:35" },
+};
 
 function normalizePeriodToFixedBlock(value) {
   const raw = String(value ?? "").trim();
@@ -75,7 +105,15 @@ const state = {
   selectedCollege: "",
   selectedMajor: "",
   selectedDirection: "",
+  selectedWeekNumber: "",
+  compactMode: true,
+  enableIcs: false,
+  termStartDate: "",
   classFilterDebounceTimer: null,
+  hashDebounceTimer: null,
+  cardRegistry: new Map(),
+  lastRenderedRows: [],
+  hasAppliedHashState: false,
 };
 
 function formatDate(value) {
@@ -101,6 +139,95 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getHashState() {
+  const raw = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(raw);
+  return {
+    q: params.get("q") || "",
+    cf: params.get("cf") || "",
+    wf: params.get("wf") || "",
+    wm: params.get("wm") || "all",
+    wn: params.get("wn") || "",
+    c: params.get("c") || "",
+    g: params.get("g") || "",
+    co: params.get("co") || "",
+    m: params.get("m") || "",
+    d: params.get("d") || "",
+    cp: params.get("cp") || "1",
+    ei: params.get("ei") || "0",
+    ts: params.get("ts") || "",
+  };
+}
+
+function applyHashStateToControls() {
+  const hashState = getHashState();
+  searchInput.value = hashState.q;
+  classFilterInput.value = hashState.cf;
+  weekFilterInput.value = hashState.wf;
+  weekModeSelect.value = hashState.wm === "odd" || hashState.wm === "even" ? hashState.wm : "all";
+  weekNumberSelect.value = hashState.wn;
+  compactToggle.checked = hashState.cp !== "0";
+  enableIcsToggle.checked = hashState.ei === "1";
+  termStartInput.value = hashState.ts;
+
+  state.classFilterKeyword = hashState.cf;
+  state.selectedWeekNumber = hashState.wn;
+  state.currentClassId = hashState.c;
+  state.selectedGrade = hashState.g;
+  state.selectedCollege = hashState.co;
+  state.selectedMajor = hashState.m;
+  state.selectedDirection = hashState.d;
+  state.compactMode = compactToggle.checked;
+  state.enableIcs = enableIcsToggle.checked;
+  state.termStartDate = hashState.ts;
+  state.hasAppliedHashState = true;
+}
+
+function writeHashStateNow() {
+  const params = new URLSearchParams();
+  const put = (key, value) => {
+    const normalized = String(value ?? "");
+    if (normalized) {
+      params.set(key, normalized);
+    }
+  };
+
+  put("q", searchInput.value.trim());
+  put("cf", state.classFilterKeyword.trim());
+  put("wf", weekFilterInput.value.trim());
+  put("wm", weekModeSelect.value);
+  put("wn", state.selectedWeekNumber);
+  put("c", state.currentClassId);
+  put("g", state.selectedGrade);
+  put("co", state.selectedCollege);
+  put("m", state.selectedMajor);
+  put("d", state.selectedDirection);
+  put("cp", state.compactMode ? "1" : "0");
+  put("ei", state.enableIcs ? "1" : "0");
+  put("ts", state.termStartDate);
+
+  const next = params.toString();
+  const target = next ? `#${next}` : "";
+  if (window.location.hash !== target) {
+    history.replaceState(null, "", target || window.location.pathname + window.location.search);
+  }
+}
+
+function scheduleHashSync() {
+  if (!state.hasAppliedHashState) {
+    return;
+  }
+  if (state.hashDebounceTimer) {
+    clearTimeout(state.hashDebounceTimer);
+  }
+  state.hashDebounceTimer = window.setTimeout(() => {
+    state.hashDebounceTimer = null;
+    writeHashStateNow();
+  }, 160);
 }
 
 function toDayLabel(value) {
@@ -134,7 +261,7 @@ function toDayLabel(value) {
   return map[raw] || raw;
 }
 
-function normalizePeriods(periods) {
+function normalizePeriods() {
   return DEFAULT_PERIODS;
 }
 
@@ -160,13 +287,14 @@ function normalizeSlots(slots) {
       return {
         day,
         period,
-        courseCode: String(slot.courseCode ?? slot.code ?? "").trim(),
+        courseCode: String(slot.courseCode ?? slot.code ?? slot.kch ?? "").trim(),
+        courseSeq: String(slot.courseSeq ?? slot.kcxh ?? slot.seq ?? "").trim(),
         courseName,
-        teacher: String(slot.teacher ?? "").trim(),
-        location: String(slot.location ?? slot.room ?? "").trim(),
+        teacher: String(slot.teacher ?? slot.jsxm ?? "").trim(),
+        location: String(slot.location ?? slot.room ?? slot.jas ?? "").trim(),
         weekBitmap: String(slot.weekBitmap ?? slot.skzc ?? slot.Skzc ?? "").trim(),
-        weeks: String(slot.weeks ?? slot.week ?? "").trim(),
-        note: String(slot.note ?? "").trim(),
+        weeks: String(slot.weeks ?? slot.week ?? slot.zcd ?? "").trim(),
+        note: String(slot.note ?? slot.bz ?? "").trim(),
       };
     })
     .filter(Boolean);
@@ -216,6 +344,7 @@ function normalizeDataset(raw) {
   return {
     generated_at: raw.generated_at || "",
     source: raw.source || "",
+    term_start_date: String(raw.term_start_date ?? raw.termStartDate ?? "").trim(),
     periods: normalizePeriods(raw.periods),
     classes,
   };
@@ -239,19 +368,20 @@ function groupPeriods(periods) {
   return groups;
 }
 
-function renderCourseCard(slot) {
+function renderCourseCard(slot, registryKey) {
   const codeText = slot.courseCode
     ? `[${escapeHtml(slot.courseCode)}]`
     : "[未设置编码]";
   const detailLine = [slot.teacher, slot.weeks, slot.note].filter(Boolean).join(" ");
+  const compactClass = state.compactMode ? "course-card compact" : "course-card";
 
   return `
-    <article class="course-card">
+    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}">
       <div class="course-code">${codeText}</div>
       <div class="course-name">${escapeHtml(slot.courseName)}</div>
       <div class="course-meta">${escapeHtml(slot.location || "地点待补充")}</div>
       <div class="course-meta-sub">${escapeHtml(detailLine || "信息待补充")}</div>
-    </article>
+    </button>
   `;
 }
 
@@ -331,6 +461,27 @@ function formatWeeksSet(weeksSet) {
   return `${parts.join(",")}周`;
 }
 
+function getParityLabel(weeksSet) {
+  if (!weeksSet || !weeksSet.size) {
+    return "";
+  }
+
+  let hasOdd = false;
+  let hasEven = false;
+  for (const week of weeksSet) {
+    if (week % 2 === 1) {
+      hasOdd = true;
+    } else {
+      hasEven = true;
+    }
+    if (hasOdd && hasEven) {
+      return "单双周";
+    }
+  }
+
+  return hasOdd ? "单周" : "双周";
+}
+
 function parseWeekFilter(text, mode) {
   const raw = String(text ?? "").trim();
   const weeks = parseWeeksFromText(raw);
@@ -350,6 +501,44 @@ function parseWeekFilter(text, mode) {
       .filter(Boolean)
       .join(" "),
   };
+}
+
+function cloneWeekFilter(filter) {
+  if (!filter) {
+    return { weeks: null, parity: null, enabled: false, label: "" };
+  }
+  return {
+    weeks: filter.weeks ? new Set(filter.weeks) : null,
+    parity: filter.parity || null,
+    enabled: Boolean(filter.enabled),
+    label: filter.label || "",
+  };
+}
+
+function applySelectedWeekNumber(filter, weekNumberText) {
+  const weekNumber = Number.parseInt(String(weekNumberText || "").trim(), 10);
+  if (!Number.isFinite(weekNumber) || weekNumber < 1 || weekNumber > 30) {
+    return filter;
+  }
+
+  const next = cloneWeekFilter(filter);
+  const selectedSet = new Set([weekNumber]);
+  if (next.weeks && next.weeks.size) {
+    const intersection = new Set();
+    for (const value of next.weeks) {
+      if (selectedSet.has(value)) {
+        intersection.add(value);
+      }
+    }
+    next.weeks = intersection;
+  } else {
+    next.weeks = selectedSet;
+  }
+
+  const labels = [next.label, `当前周:${weekNumber}`].filter(Boolean);
+  next.label = labels.join("｜");
+  next.enabled = true;
+  return next;
 }
 
 function resolveSlotWeekSet(slot) {
@@ -397,7 +586,16 @@ function mergeSlotsForDisplay(slots) {
   const merged = new Map();
 
   for (const slot of slots) {
-    const key = [slot.courseCode, slot.courseName, slot.location].join("|");
+    const key = [
+      slot.day,
+      slot.period,
+      slot.location,
+      slot.teacher,
+      slot.courseCode,
+      slot.courseSeq,
+      slot.courseName,
+    ].join("|");
+
     if (!merged.has(key)) {
       merged.set(key, {
         ...slot,
@@ -442,11 +640,16 @@ function mergeSlotsForDisplay(slots) {
     const notes = Array.from(item._notes);
     const note = notes.length <= 1 ? (notes[0] || "") : `多教学班(${notes.length})`;
 
+    const weeksSet = item._weeksSet.size ? new Set(item._weeksSet) : null;
+    const parityLabel = getParityLabel(weeksSet);
+
     const normalized = {
       ...item,
       teacher,
       weeks,
       note,
+      parityLabel,
+      weeksSet,
     };
     delete normalized._weeksSet;
     delete normalized._weeksText;
@@ -456,58 +659,6 @@ function mergeSlotsForDisplay(slots) {
   });
 }
 
-function toSummaryText(values, maxCount, suffix) {
-  if (!values.length) {
-    return "";
-  }
-  if (values.length <= maxCount) {
-    return values.join(" / ");
-  }
-  return `${values.slice(0, maxCount).join(" / ")} 等${values.length}${suffix}`;
-}
-
-function collapseSlotsToSingleCard(slots) {
-  const merged = mergeSlotsForDisplay(slots);
-  if (!merged.length) {
-    return null;
-  }
-  if (merged.length === 1) {
-    return merged[0];
-  }
-
-  const courseNames = Array.from(new Set(merged.map((item) => item.courseName).filter(Boolean)));
-  const courseCodes = Array.from(new Set(merged.map((item) => item.courseCode).filter(Boolean)));
-  const teachers = Array.from(new Set(merged.map((item) => item.teacher).filter(Boolean)));
-  const locations = Array.from(new Set(merged.map((item) => item.location).filter(Boolean)));
-  const notes = Array.from(new Set(merged.map((item) => item.note).filter(Boolean)));
-
-  const weeksSet = new Set();
-  for (const slot of merged) {
-    const parsedWeeks = resolveSlotWeekSet(slot);
-    if (!parsedWeeks || !parsedWeeks.size) {
-      continue;
-    }
-    for (const week of parsedWeeks) {
-      weeksSet.add(week);
-    }
-  }
-
-  const primary = merged[0];
-  const weeks = weeksSet.size
-    ? formatWeeksSet(weeksSet)
-    : Array.from(new Set(merged.map((item) => item.weeks).filter(Boolean))).join(" + ");
-
-  return {
-    ...primary,
-    courseCode: courseCodes.length === 1 ? courseCodes[0] : `共${courseCodes.length}门`,
-    courseName: toSummaryText(courseNames, 2, "门课"),
-    teacher: toSummaryText(teachers, 3, "位教师"),
-    location: toSummaryText(locations, 2, "个地点"),
-    weeks,
-    note: notes.length <= 1 ? (notes[0] || "") : `同节次合并(${merged.length})`,
-  };
-}
-
 function buildSlotMap(slots, keyword, weekFilter) {
   const lowered = keyword.trim().toLowerCase();
   const map = new Map();
@@ -515,6 +666,7 @@ function buildSlotMap(slots, keyword, weekFilter) {
   for (const slot of slots) {
     const searchable = [
       slot.courseCode,
+      slot.courseSeq,
       slot.courseName,
       slot.location,
       slot.teacher,
@@ -567,8 +719,8 @@ function getFilteredClasses(dataset) {
     }
 
     if (
-      state.selectedDirection &&
-      resolveDirectionFilterValue(item, "未命名方向") !== state.selectedDirection
+      state.selectedDirection
+      && resolveDirectionFilterValue(item, "未命名方向") !== state.selectedDirection
     ) {
       return false;
     }
@@ -732,14 +884,41 @@ function currentClass() {
   }
 
   return (
-    filteredClasses.find((item) => item.id === state.currentClassId) ||
-    filteredClasses[0]
+    filteredClasses.find((item) => item.id === state.currentClassId)
+    || filteredClasses[0]
   );
+}
+
+function getVisibleMergedRows(classItem, keyword, weekFilter) {
+  if (!classItem) {
+    return [];
+  }
+
+  const slotMap = buildSlotMap(classItem.slots, keyword, weekFilter);
+  const rows = [];
+
+  for (const period of DEFAULT_PERIODS) {
+    for (const day of DAYS) {
+      const key = `${period.id}|${day}`;
+      const slots = slotMap.get(key) || [];
+      if (!slots.length) {
+        continue;
+      }
+      const merged = mergeSlotsForDisplay(slots);
+      for (const item of merged) {
+        rows.push(item);
+      }
+    }
+  }
+
+  return rows;
 }
 
 function renderGridTable(classItem, periods, keyword, weekFilter) {
   const slotMap = buildSlotMap(classItem.slots, keyword, weekFilter);
   const groups = groupPeriods(periods);
+  const cardRegistry = new Map();
+  let cardCounter = 0;
 
   const headerCells = DAYS.map((day) => `<th>${escapeHtml(day)}</th>`).join("");
   const rows = [];
@@ -761,33 +940,51 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
           return '<td class="course-cell"><div class="empty-cell"></div></td>';
         }
 
-        const displaySlot = collapseSlotsToSingleCard(slots);
-        if (!displaySlot) {
+        const mergedSlots = mergeSlotsForDisplay(slots);
+        if (!mergedSlots.length) {
           return '<td class="course-cell"><div class="empty-cell"></div></td>';
         }
 
-        const card = renderCourseCard(displaySlot);
-        return `<td class="course-cell"><div class="course-stack">${card}</div></td>`;
+        const registryKey = `cell-${cardCounter++}`;
+        cardRegistry.set(registryKey, {
+          day,
+          period: period.id,
+          items: mergedSlots,
+        });
+
+        const visibleItems = mergedSlots.slice(0, 2);
+        const hiddenCount = Math.max(0, mergedSlots.length - visibleItems.length);
+        const cardsHtml = visibleItems
+          .map((item) => renderCourseCard(item, registryKey))
+          .join("");
+        const moreButton = hiddenCount
+          ? `<button type="button" class="more-courses-btn" data-open-slot="${escapeHtml(registryKey)}">+${hiddenCount}</button>`
+          : "";
+
+        return `<td class="course-cell"><div class="course-stack">${cardsHtml}${moreButton}</div></td>`;
       }).join("");
 
       rows.push(`<tr>${sessionCell}${periodCell}${dayCells}</tr>`);
     });
   }
 
-  return `
-    <table class="schedule-table">
-      <thead>
-        <tr>
-          <th>时段</th>
-          <th>节</th>
-          ${headerCells}
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.join("")}
-      </tbody>
-    </table>
-  `;
+  return {
+    html: `
+      <table class="schedule-table ${state.compactMode ? "is-compact" : ""}">
+        <thead>
+          <tr>
+            <th>时段</th>
+            <th>节</th>
+            ${headerCells}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.join("")}
+        </tbody>
+      </table>
+    `,
+    cardRegistry,
+  };
 }
 
 function renderLegacyTable(data, keyword = "") {
@@ -804,11 +1001,10 @@ function renderLegacyTable(data, keyword = "") {
   const lowered = keyword.trim().toLowerCase();
   const filteredRows = lowered
     ? rows.filter((row) =>
-        Object.values(row)
-          .join(" ")
-          .toLowerCase()
-          .includes(lowered),
-      )
+      Object.values(row)
+        .join(" ")
+        .toLowerCase()
+        .includes(lowered))
     : rows;
 
   if (!filteredRows.length) {
@@ -862,6 +1058,48 @@ function renderClassOptions(dataset) {
   classSelect.disabled = filteredClasses.length <= 1;
 }
 
+function maxWeekInDataset(dataset) {
+  if (!dataset || !Array.isArray(dataset.classes)) {
+    return 20;
+  }
+
+  let maxWeek = 0;
+  for (const classItem of dataset.classes) {
+    for (const slot of classItem.slots || []) {
+      const set = resolveSlotWeekSet(slot);
+      if (!set || !set.size) {
+        continue;
+      }
+      const localMax = Math.max(...set);
+      if (localMax > maxWeek) {
+        maxWeek = localMax;
+      }
+    }
+  }
+
+  return Math.max(maxWeek, 20);
+}
+
+function renderWeekNumberOptions(dataset) {
+  const maxWeek = maxWeekInDataset(dataset);
+  const options = ['<option value="">全部周</option>'];
+  for (let index = 1; index <= maxWeek; index += 1) {
+    options.push(`<option value="${index}">第${index}周</option>`);
+  }
+  weekNumberSelect.innerHTML = options.join("");
+  weekNumberSelect.value = state.selectedWeekNumber;
+}
+
+function refreshIcsAvailability(dataset) {
+  if (!termStartInput.value && dataset?.term_start_date) {
+    termStartInput.value = dataset.term_start_date;
+    state.termStartDate = termStartInput.value;
+  }
+
+  const enabled = state.enableIcs && Boolean(state.termStartDate);
+  exportIcsBtn.disabled = !enabled;
+}
+
 function renderGridView() {
   const dataset = state.dataset;
   const classItem = currentClass();
@@ -870,18 +1108,24 @@ function renderGridView() {
       ? "没有匹配班级，请修改班级检索关键字"
       : "没有可展示的课表数据";
     tableContainer.innerHTML = `<div class="empty">${escapeHtml(emptyText)}</div>`;
+    state.cardRegistry = new Map();
+    state.lastRenderedRows = [];
     return;
   }
 
-  const weekFilter = parseWeekFilter(weekFilterInput.value, weekModeSelect.value);
+  const baseWeekFilter = parseWeekFilter(weekFilterInput.value, weekModeSelect.value);
+  const weekFilter = applySelectedWeekNumber(baseWeekFilter, state.selectedWeekNumber);
 
   viewTitleNode.textContent = `${classItem.name}${classItem.term ? ` ${classItem.term}` : ""} 课表`;
-  tableContainer.innerHTML = renderGridTable(
+  const rendered = renderGridTable(
     classItem,
     dataset.periods,
     searchInput.value,
     weekFilter,
   );
+  tableContainer.innerHTML = rendered.html;
+  state.cardRegistry = rendered.cardRegistry;
+  state.lastRenderedRows = getVisibleMergedRows(classItem, searchInput.value, weekFilter);
 
   const updateText = formatDate(dataset.generated_at);
   const filteredClasses = getFilteredClasses(dataset);
@@ -889,6 +1133,222 @@ function renderGridView() {
   setStatus(
     `更新时间：${updateText}｜班级：${filteredClasses.length}/${dataset.classes.length}｜当前：${classItem.name}${filterText}｜版本：${state.metaVersion || "-"}`,
   );
+
+  document.body.classList.toggle("compact-mode", state.compactMode);
+  refreshIcsAvailability(dataset);
+}
+
+function toCsvField(value) {
+  const text = String(value ?? "");
+  const escaped = text.replaceAll('"', '""');
+  return `"${escaped}"`;
+}
+
+function downloadFile(content, fileName, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportCurrentCsv() {
+  const classItem = currentClass();
+  if (!classItem) {
+    setStatus("导出失败：无可用班级", true);
+    return;
+  }
+
+  const rows = state.lastRenderedRows;
+  if (!rows.length) {
+    setStatus("导出失败：当前筛选结果为空", true);
+    return;
+  }
+
+  const headers = [
+    "班级",
+    "星期",
+    "节次",
+    "课程编码",
+    "课序号",
+    "课程名",
+    "教师",
+    "地点",
+    "周次",
+    "单双周",
+    "备注",
+  ];
+
+  const lines = [headers.map(toCsvField).join(",")];
+  for (const item of rows) {
+    const row = [
+      classItem.name,
+      item.day,
+      item.period,
+      item.courseCode,
+      item.courseSeq,
+      item.courseName,
+      item.teacher,
+      item.location,
+      item.weeks,
+      item.parityLabel,
+      item.note,
+    ];
+    lines.push(row.map(toCsvField).join(","));
+  }
+
+  const fileName = `${classItem.name.replaceAll(/\s+/g, "_")}_课表.csv`;
+  downloadFile(`\uFEFF${lines.join("\n")}`, fileName, "text/csv;charset=utf-8");
+  setStatus(`已导出 CSV：${rows.length} 条`, false);
+}
+
+function formatIcsDateTime(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const hour = `${date.getHours()}`.padStart(2, "0");
+  const minute = `${date.getMinutes()}`.padStart(2, "0");
+  const second = `${date.getSeconds()}`.padStart(2, "0");
+  return `${year}${month}${day}T${hour}${minute}${second}`;
+}
+
+function addDays(baseDate, dayCount) {
+  const next = new Date(baseDate);
+  next.setDate(baseDate.getDate() + dayCount);
+  return next;
+}
+
+function parseClockToDate(baseDate, clock) {
+  const [hourRaw, minuteRaw] = clock.split(":");
+  const date = new Date(baseDate);
+  date.setHours(Number.parseInt(hourRaw, 10), Number.parseInt(minuteRaw, 10), 0, 0);
+  return date;
+}
+
+function escapeIcsText(value) {
+  return String(value ?? "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll(";", "\\;")
+    .replaceAll(",", "\\,")
+    .replaceAll("\n", "\\n");
+}
+
+function exportCurrentIcs() {
+  const classItem = currentClass();
+  if (!classItem) {
+    setStatus("导出失败：无可用班级", true);
+    return;
+  }
+
+  if (!state.enableIcs) {
+    setStatus("请先启用 ICS", true);
+    return;
+  }
+
+  if (!state.termStartDate) {
+    setStatus("导出 ICS 需要填写开学周一", true);
+    return;
+  }
+
+  const startMonday = new Date(`${state.termStartDate}T00:00:00`);
+  if (Number.isNaN(startMonday.getTime())) {
+    setStatus("开学周一日期无效", true);
+    return;
+  }
+
+  const rows = state.lastRenderedRows;
+  if (!rows.length) {
+    setStatus("导出失败：当前筛选结果为空", true);
+    return;
+  }
+
+  const nowStamp = formatIcsDateTime(new Date());
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//school-timetable-static//CN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+  ];
+
+  let eventCount = 0;
+  rows.forEach((row, rowIndex) => {
+    const dayOffset = DAY_INDEX[row.day];
+    const timeRange = PERIOD_TIME_RANGE[row.period];
+    const weeksSet = row.weeksSet || parseWeeksFromText(row.weeks);
+    if (dayOffset === undefined || !timeRange || !weeksSet || !weeksSet.size) {
+      return;
+    }
+
+    const sortedWeeks = Array.from(weeksSet).sort((left, right) => left - right);
+    sortedWeeks.forEach((weekNo, weekIndex) => {
+      const classDay = addDays(startMonday, (weekNo - 1) * 7 + dayOffset);
+      const dtStart = parseClockToDate(classDay, timeRange.start);
+      const dtEnd = parseClockToDate(classDay, timeRange.end);
+      const uid = `${classItem.id}-${rowIndex}-${weekIndex}-${weekNo}@school-timetable`;
+
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:${escapeIcsText(uid)}`);
+      lines.push(`DTSTAMP:${nowStamp}`);
+      lines.push(`DTSTART:${formatIcsDateTime(dtStart)}`);
+      lines.push(`DTEND:${formatIcsDateTime(dtEnd)}`);
+      lines.push(`SUMMARY:${escapeIcsText(row.courseName)}`);
+      lines.push(`LOCATION:${escapeIcsText(row.location || "")}`);
+      lines.push(`DESCRIPTION:${escapeIcsText(`班级:${classItem.name}\\n教师:${row.teacher}\\n周次:${row.weeks}`)}`);
+      lines.push("END:VEVENT");
+      eventCount += 1;
+    });
+  });
+
+  lines.push("END:VCALENDAR");
+
+  if (!eventCount) {
+    setStatus("导出 ICS 失败：没有可转换的周次数据", true);
+    return;
+  }
+
+  const fileName = `${classItem.name.replaceAll(/\s+/g, "_")}_课表.ics`;
+  downloadFile(lines.join("\r\n"), fileName, "text/calendar;charset=utf-8");
+  setStatus(`已导出 ICS：${eventCount} 个日程`, false);
+}
+
+function renderDetailItems(items) {
+  if (!Array.isArray(items) || !items.length) {
+    return '<div class="empty">没有课程详情</div>';
+  }
+
+  return items
+    .map((item) => `
+      <article class="detail-card">
+        <div><strong>课程：</strong>${escapeHtml(item.courseName || "-")}</div>
+        <div><strong>编码：</strong>${escapeHtml(item.courseCode || "-")}</div>
+        <div><strong>课序号：</strong>${escapeHtml(item.courseSeq || "-")}</div>
+        <div><strong>教师：</strong>${escapeHtml(item.teacher || "-")}</div>
+        <div><strong>地点：</strong>${escapeHtml(item.location || "-")}</div>
+        <div><strong>周次：</strong>${escapeHtml(item.weeks || "-")} ${escapeHtml(item.parityLabel || "")}</div>
+        <div><strong>备注：</strong>${escapeHtml(item.note || "-")}</div>
+      </article>
+    `)
+    .join("");
+}
+
+function openDetailModal(payload) {
+  if (!payload || !Array.isArray(payload.items)) {
+    return;
+  }
+  detailModalTitle.textContent = `${payload.day} ${payload.period} 节次详情`;
+  detailModalBody.innerHTML = renderDetailItems(payload.items);
+  detailModal.classList.remove("hidden");
+  detailModal.setAttribute("aria-hidden", "false");
+}
+
+function closeDetailModal() {
+  detailModal.classList.add("hidden");
+  detailModal.setAttribute("aria-hidden", "true");
 }
 
 async function fetchMeta() {
@@ -943,6 +1403,9 @@ async function loadTimetable() {
     try {
       const meta = await fetchMeta();
       version = meta ? meta.version : "";
+      if (meta?.term_start_date && !state.termStartDate) {
+        state.termStartDate = String(meta.term_start_date);
+      }
     } catch (error) {
       console.warn("load meta.json failed", error);
     }
@@ -954,8 +1417,13 @@ async function loadTimetable() {
     if (normalizedMulti) {
       state.dataset = normalizedMulti;
       state.legacyData = null;
+      if (!state.termStartDate && normalizedMulti.term_start_date) {
+        state.termStartDate = normalizedMulti.term_start_date;
+      }
       renderClassOptions(normalizedMulti);
+      renderWeekNumberOptions(normalizedMulti);
       renderGridView();
+      scheduleHashSync();
       return;
     }
 
@@ -965,8 +1433,13 @@ async function loadTimetable() {
     if (normalizedSingle) {
       state.dataset = normalizedSingle;
       state.legacyData = null;
+      if (!state.termStartDate && normalizedSingle.term_start_date) {
+        state.termStartDate = normalizedSingle.term_start_date;
+      }
       renderClassOptions(normalizedSingle);
+      renderWeekNumberOptions(normalizedSingle);
       renderGridView();
+      scheduleHashSync();
       return;
     }
 
@@ -991,15 +1464,42 @@ async function loadTimetable() {
   }
 }
 
+tableContainer.addEventListener("click", (event) => {
+  const target = event.target.closest("[data-open-slot]");
+  if (!target) {
+    return;
+  }
+
+  const key = target.getAttribute("data-open-slot");
+  if (!key) {
+    return;
+  }
+  const payload = state.cardRegistry.get(key);
+  if (!payload) {
+    return;
+  }
+  openDetailModal(payload);
+});
+
+detailModalBackdrop.addEventListener("click", closeDetailModal);
+detailModalClose.addEventListener("click", closeDetailModal);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !detailModal.classList.contains("hidden")) {
+    closeDetailModal();
+  }
+});
+
 searchInput.addEventListener("input", () => {
   if (state.dataset) {
     renderGridView();
+    scheduleHashSync();
     return;
   }
 
   if (state.legacyData) {
     renderLegacyTable(state.legacyData, searchInput.value);
   }
+  scheduleHashSync();
 });
 
 classFilterInput.addEventListener("input", () => {
@@ -1014,18 +1514,25 @@ classFilterInput.addEventListener("input", () => {
       renderClassOptions(state.dataset);
       renderGridView();
     }
+    scheduleHashSync();
   }, 180);
 });
 
 weekFilterInput.addEventListener("input", () => {
   if (state.dataset) {
     renderGridView();
-    return;
-  }
-
-  if (state.legacyData) {
+  } else if (state.legacyData) {
     renderLegacyTable(state.legacyData, searchInput.value);
   }
+  scheduleHashSync();
+});
+
+weekNumberSelect.addEventListener("change", () => {
+  state.selectedWeekNumber = weekNumberSelect.value;
+  if (state.dataset) {
+    renderGridView();
+  }
+  scheduleHashSync();
 });
 
 classSelect.addEventListener("change", () => {
@@ -1033,6 +1540,7 @@ classSelect.addEventListener("change", () => {
   if (state.dataset) {
     renderGridView();
   }
+  scheduleHashSync();
 });
 
 gradeSelect.addEventListener("change", () => {
@@ -1044,6 +1552,7 @@ gradeSelect.addEventListener("change", () => {
     renderClassOptions(state.dataset);
     renderGridView();
   }
+  scheduleHashSync();
 });
 
 collegeSelect.addEventListener("change", () => {
@@ -1054,6 +1563,7 @@ collegeSelect.addEventListener("change", () => {
     renderClassOptions(state.dataset);
     renderGridView();
   }
+  scheduleHashSync();
 });
 
 majorSelect.addEventListener("change", () => {
@@ -1063,6 +1573,7 @@ majorSelect.addEventListener("change", () => {
     renderClassOptions(state.dataset);
     renderGridView();
   }
+  scheduleHashSync();
 });
 
 directionSelect.addEventListener("change", () => {
@@ -1071,16 +1582,51 @@ directionSelect.addEventListener("change", () => {
     renderClassOptions(state.dataset);
     renderGridView();
   }
+  scheduleHashSync();
 });
 
 weekModeSelect.addEventListener("change", () => {
   if (state.dataset) {
     renderGridView();
   }
+  scheduleHashSync();
 });
+
+compactToggle.addEventListener("change", () => {
+  state.compactMode = compactToggle.checked;
+  if (state.dataset) {
+    renderGridView();
+  }
+  scheduleHashSync();
+});
+
+enableIcsToggle.addEventListener("change", () => {
+  state.enableIcs = enableIcsToggle.checked;
+  refreshIcsAvailability(state.dataset);
+  scheduleHashSync();
+});
+
+termStartInput.addEventListener("change", () => {
+  state.termStartDate = termStartInput.value;
+  refreshIcsAvailability(state.dataset);
+  scheduleHashSync();
+});
+
+exportCsvBtn.addEventListener("click", exportCurrentCsv);
+exportIcsBtn.addEventListener("click", exportCurrentIcs);
 
 reloadButton.addEventListener("click", () => {
   loadTimetable();
 });
 
+window.addEventListener("hashchange", () => {
+  applyHashStateToControls();
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderWeekNumberOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+applyHashStateToControls();
 loadTimetable();

@@ -55,6 +55,13 @@
         </label>
 
         <label class="control">
+          <span>当前周</span>
+          <select id="weekNumberSelect">
+            <option value="">全部周</option>
+          </select>
+        </label>
+
+        <label class="control">
           <span>单双周</span>
           <select id="weekModeSelect">
             <option value="all">全部周</option>
@@ -63,10 +70,40 @@
           </select>
         </label>
 
+        <label class="control control-inline">
+          <span>紧凑显示</span>
+          <input id="compactToggle" type="checkbox" checked />
+        </label>
+
+        <button id="exportCsvBtn" type="button">导出 CSV</button>
+
+        <label class="control control-inline">
+          <span>启用 ICS</span>
+          <input id="enableIcsToggle" type="checkbox" />
+        </label>
+
+        <label class="control">
+          <span>开学周一</span>
+          <input id="termStartInput" type="date" />
+        </label>
+
+        <button id="exportIcsBtn" type="button" disabled>导出 ICS</button>
+
         <button id="reloadBtn" type="button">刷新数据</button>
       </section>
 
       <section id="tableContainer" class="table-wrap"></section>
+
+      <div id="detailModal" class="detail-modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+        <div id="detailModalBackdrop" class="detail-modal-backdrop"></div>
+        <div class="detail-modal-panel" role="document">
+          <div class="detail-modal-header">
+            <h2 id="detailModalTitle">课程详情</h2>
+            <button id="detailModalClose" type="button">关闭</button>
+          </div>
+          <div id="detailModalBody" class="detail-modal-body"></div>
+        </div>
+      </div>
     </main>
     <script src="./app.js" defer></script>
   </body>
