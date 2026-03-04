@@ -19,6 +19,14 @@ DAY_MAP = {
     7: "星期日",
 }
 
+FIXED_PERIODS: list[dict[str, str]] = [
+    {"id": "1-2", "label": "1-2", "session": "上午"},
+    {"id": "3-4", "label": "3-4", "session": "上午"},
+    {"id": "5-6", "label": "5-6", "session": "下午"},
+    {"id": "7-8", "label": "7-8", "session": "下午"},
+    {"id": "9-11", "label": "9-11", "session": "晚上"},
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="将 timetable 分片聚合为前端课表数据")
@@ -68,22 +76,27 @@ def _to_day_label(value: Any) -> str:
     return mapping.get(raw, raw)
 
 
-def _normalize_period(value: Any) -> str:
+def _normalize_period(value: Any, start_hint: Any = None) -> str:
     raw = str(value or "").strip()
-    if not raw:
+    numbers = [int(item) for item in re.findall(r"\d+", raw)]
+
+    start = numbers[0] if numbers else None
+    if start is None:
+        hint = str(start_hint or "").strip()
+        start = int(hint) if hint.isdigit() else None
+
+    if start is None:
         return ""
 
-    numbers = [int(item) for item in re.findall(r"\d+", raw)]
-    if not numbers:
-        return raw
-    if len(numbers) == 1:
-        return f"{numbers[0]}-{numbers[0]}"
-
-    start = numbers[0]
-    end = numbers[-1]
-    if start > end:
-        start, end = end, start
-    return f"{start}-{end}"
+    if start <= 2:
+        return "1-2"
+    if start <= 4:
+        return "3-4"
+    if start <= 6:
+        return "5-6"
+    if start <= 8:
+        return "7-8"
+    return "9-11"
 
 
 def _period_sort_key(period: str) -> tuple[int, int, str]:
@@ -105,13 +118,64 @@ def _period_session(period: str) -> str:
     return "晚上"
 
 
+def _first_non_empty(*values: Any) -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _normalize_direction_name(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    if re.fullmatch(r"\d+", raw):
+        return ""
+
+    return raw
+
+
+def _extract_direction_name(source: dict[str, Any] | None) -> str:
+    if not isinstance(source, dict):
+        return ""
+
+    return _normalize_direction_name(
+        _first_non_empty(
+            source.get("directionName"),
+            source.get("DirectionName"),
+            source.get("zyfxm"),
+            source.get("Zyfxm"),
+            source.get("zyfxmc"),
+            source.get("Zyfxmc"),
+            source.get("fxmc"),
+            source.get("Fxmc"),
+            source.get("fxm"),
+            source.get("Fxm"),
+            source.get("zyfx"),
+            source.get("Zyfx"),
+        )
+    )
+
+
+def _guess_direction_name_from_class_name(class_name: Any) -> str:
+    raw = str(class_name or "").strip()
+    if not raw:
+        return ""
+
+    prefix = re.split(r"\d", raw, maxsplit=1)[0].strip()
+    prefix = prefix.rstrip("班").strip()
+    return _normalize_direction_name(prefix)
+
+
 def _slot_from_row(row: dict[str, Any]) -> dict[str, str] | None:
     course_name = str(row.get("Kcm") or "").strip()
     if not course_name:
         return None
 
     day = _to_day_label(row.get("Skxq"))
-    period = _normalize_period(row.get("Jc"))
+    period = _normalize_period(row.get("Jc"), row.get("Skjc"))
     if not day or not period:
         return None
 
@@ -139,6 +203,7 @@ def _iter_batch_files(input_dir: Path) -> list[Path]:
 def build_dataset(input_dir: Path) -> dict[str, Any]:
     files = _iter_batch_files(input_dir)
     classes: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    direction_name_by_code: dict[str, str] = {}
     periods: set[str] = set()
     generated_at_candidates: list[str] = []
     semester = ""
@@ -170,6 +235,9 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
             if not class_id or not class_name:
                 continue
 
+            direction_code = str(meta.get("zyfxh") or "").strip()
+            direction_name = _extract_direction_name(meta)
+
             class_item = classes.get(class_id)
             if class_item is None:
                 class_item = {
@@ -179,7 +247,8 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                     "grade": str(meta.get("njdm") or "").strip(),
                     "collegeCode": str(meta.get("xsh") or "").strip(),
                     "majorCode": str(meta.get("zyh") or "").strip(),
-                    "directionCode": str(meta.get("zyfxh") or "").strip(),
+                    "directionCode": direction_code,
+                    "directionName": direction_name,
                     "collegeName": "",
                     "majorName": "",
                     "slots": [],
@@ -188,6 +257,13 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                 classes[class_id] = class_item
             elif not class_item.get("term") and semester:
                 class_item["term"] = semester
+
+            if not class_item.get("directionName") and direction_name:
+                class_item["directionName"] = direction_name
+
+            known_name = direction_name_by_code.get(direction_code, "") if direction_code else ""
+            if direction_code and known_name and not class_item.get("directionName"):
+                class_item["directionName"] = known_name
 
             row_container = batch_item.get("data")
             rows = row_container.get("rows") if isinstance(row_container, dict) else None
@@ -215,6 +291,17 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                     class_item["majorCode"] = str(row.get("Zyh") or row.get("zyh") or "").strip()
                 if not class_item.get("directionCode"):
                     class_item["directionCode"] = str(row.get("zyfxh") or row.get("Zyfxh") or "").strip()
+                if not class_item.get("directionName"):
+                    class_item["directionName"] = _extract_direction_name(row)
+
+                current_direction_code = str(class_item.get("directionCode") or "").strip()
+                current_direction_name = _normalize_direction_name(class_item.get("directionName"))
+                if current_direction_code and current_direction_name:
+                    direction_name_by_code.setdefault(current_direction_code, current_direction_name)
+                elif current_direction_code and not current_direction_name:
+                    known_name = direction_name_by_code.get(current_direction_code, "")
+                    if known_name:
+                        class_item["directionName"] = known_name
 
                 periods.add(slot["period"])
                 unique_key = (
@@ -236,6 +323,19 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
     class_list: list[dict[str, Any]] = []
     for item in classes.values():
         item.pop("_seen", None)
+
+        direction_code = str(item.get("directionCode") or "").strip()
+        direction_name = _normalize_direction_name(item.get("directionName"))
+        if direction_code and not direction_name:
+            direction_name = direction_name_by_code.get(direction_code, "")
+        if direction_code and not direction_name:
+            direction_name = _guess_direction_name_from_class_name(item.get("name"))
+        if not direction_code:
+            direction_name = ""
+        item["directionName"] = direction_name
+        if direction_code and direction_name:
+            direction_name_by_code.setdefault(direction_code, direction_name)
+
         slots = item.get("slots")
         if not isinstance(slots, list) or len(slots) == 0:
             continue
@@ -244,23 +344,7 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
     if not class_list:
         raise RuntimeError("未构建出任何班级课表，请检查分片 JSON 格式")
 
-    period_items = [
-        {
-            "id": period,
-            "label": period,
-            "session": _period_session(period),
-        }
-        for period in sorted(periods, key=_period_sort_key)
-    ]
-
-    if not period_items:
-        period_items = [
-            {"id": "1-2", "label": "1-2", "session": "上午"},
-            {"id": "3-4", "label": "3-4", "session": "上午"},
-            {"id": "5-6", "label": "5-6", "session": "下午"},
-            {"id": "7-8", "label": "7-8", "session": "下午"},
-            {"id": "9-11", "label": "9-11", "session": "晚上"},
-        ]
+    period_items = FIXED_PERIODS
 
     generated_at = max(generated_at_candidates) if generated_at_candidates else datetime.now(timezone.utc).isoformat()
 

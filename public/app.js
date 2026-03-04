@@ -30,6 +30,41 @@ const DEFAULT_PERIODS = [
   { id: "9-11", label: "9-11", session: "晚上" },
 ];
 
+function normalizePeriodToFixedBlock(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  if (DEFAULT_PERIODS.some((period) => period.id === raw)) {
+    return raw;
+  }
+
+  const numbers = raw.match(/\d+/g) || [];
+  if (!numbers.length) {
+    return "";
+  }
+
+  const start = Number.parseInt(numbers[0], 10);
+  if (!Number.isFinite(start)) {
+    return "";
+  }
+
+  if (start <= 2) {
+    return "1-2";
+  }
+  if (start <= 4) {
+    return "3-4";
+  }
+  if (start <= 6) {
+    return "5-6";
+  }
+  if (start <= 8) {
+    return "7-8";
+  }
+  return "9-11";
+}
+
 const state = {
   dataset: null,
   legacyData: null,
@@ -100,30 +135,7 @@ function toDayLabel(value) {
 }
 
 function normalizePeriods(periods) {
-  if (!Array.isArray(periods) || !periods.length) {
-    return DEFAULT_PERIODS;
-  }
-
-  const normalized = periods
-    .map((item) => {
-      if (!item || typeof item !== "object") {
-        return null;
-      }
-
-      const id = String(item.id ?? item.label ?? item.period ?? "").trim();
-      if (!id) {
-        return null;
-      }
-
-      return {
-        id,
-        label: String(item.label ?? id),
-        session: String(item.session ?? "未分组"),
-      };
-    })
-    .filter(Boolean);
-
-  return normalized.length ? normalized : DEFAULT_PERIODS;
+  return DEFAULT_PERIODS;
 }
 
 function normalizeSlots(slots) {
@@ -138,7 +150,7 @@ function normalizeSlots(slots) {
       }
 
       const day = toDayLabel(slot.day ?? slot.weekday ?? slot.dayLabel ?? "");
-      const period = String(slot.period ?? slot.section ?? slot.time ?? "").trim();
+      const period = normalizePeriodToFixedBlock(slot.period ?? slot.section ?? slot.time ?? "");
       const courseName = String(slot.courseName ?? slot.course ?? "").trim();
 
       if (!day || !period || !courseName) {
@@ -191,6 +203,7 @@ function normalizeDataset(raw) {
         majorCode: String(item.majorCode ?? item.zyh ?? "").trim(),
         majorName: String(item.majorName ?? item.zym ?? "").trim(),
         directionCode: String(item.directionCode ?? item.zyfxh ?? "").trim(),
+        directionName: String(item.directionName ?? item.zyfxm ?? item.fxmc ?? "").trim(),
         slots,
       };
     })
@@ -384,12 +397,14 @@ function mergeSlotsForDisplay(slots) {
   const merged = new Map();
 
   for (const slot of slots) {
-    const key = [slot.courseCode, slot.courseName, slot.teacher, slot.location, slot.note].join("|");
+    const key = [slot.courseCode, slot.courseName, slot.location].join("|");
     if (!merged.has(key)) {
       merged.set(key, {
         ...slot,
         _weeksSet: new Set(),
         _weeksText: new Set(),
+        _teachers: new Set(),
+        _notes: new Set(),
       });
     }
 
@@ -404,20 +419,93 @@ function mergeSlotsForDisplay(slots) {
     if (slot.weeks) {
       item._weeksText.add(slot.weeks);
     }
+
+    if (slot.teacher) {
+      item._teachers.add(slot.teacher);
+    }
+
+    if (slot.note) {
+      item._notes.add(slot.note);
+    }
   }
 
   return Array.from(merged.values()).map((item) => {
     const weeks = item._weeksSet.size
       ? formatWeeksSet(item._weeksSet)
       : Array.from(item._weeksText).join(" + ");
+
+    const teachers = Array.from(item._teachers);
+    const teacher = teachers.length <= 3
+      ? teachers.join(" / ")
+      : `${teachers.slice(0, 3).join(" / ")} 等${teachers.length}位`;
+
+    const notes = Array.from(item._notes);
+    const note = notes.length <= 1 ? (notes[0] || "") : `多教学班(${notes.length})`;
+
     const normalized = {
       ...item,
+      teacher,
       weeks,
+      note,
     };
     delete normalized._weeksSet;
     delete normalized._weeksText;
+    delete normalized._teachers;
+    delete normalized._notes;
     return normalized;
   });
+}
+
+function toSummaryText(values, maxCount, suffix) {
+  if (!values.length) {
+    return "";
+  }
+  if (values.length <= maxCount) {
+    return values.join(" / ");
+  }
+  return `${values.slice(0, maxCount).join(" / ")} 等${values.length}${suffix}`;
+}
+
+function collapseSlotsToSingleCard(slots) {
+  const merged = mergeSlotsForDisplay(slots);
+  if (!merged.length) {
+    return null;
+  }
+  if (merged.length === 1) {
+    return merged[0];
+  }
+
+  const courseNames = Array.from(new Set(merged.map((item) => item.courseName).filter(Boolean)));
+  const courseCodes = Array.from(new Set(merged.map((item) => item.courseCode).filter(Boolean)));
+  const teachers = Array.from(new Set(merged.map((item) => item.teacher).filter(Boolean)));
+  const locations = Array.from(new Set(merged.map((item) => item.location).filter(Boolean)));
+  const notes = Array.from(new Set(merged.map((item) => item.note).filter(Boolean)));
+
+  const weeksSet = new Set();
+  for (const slot of merged) {
+    const parsedWeeks = resolveSlotWeekSet(slot);
+    if (!parsedWeeks || !parsedWeeks.size) {
+      continue;
+    }
+    for (const week of parsedWeeks) {
+      weeksSet.add(week);
+    }
+  }
+
+  const primary = merged[0];
+  const weeks = weeksSet.size
+    ? formatWeeksSet(weeksSet)
+    : Array.from(new Set(merged.map((item) => item.weeks).filter(Boolean))).join(" + ");
+
+  return {
+    ...primary,
+    courseCode: courseCodes.length === 1 ? courseCodes[0] : `共${courseCodes.length}门`,
+    courseName: toSummaryText(courseNames, 2, "门课"),
+    teacher: toSummaryText(teachers, 3, "位教师"),
+    location: toSummaryText(locations, 2, "个地点"),
+    weeks,
+    note: notes.length <= 1 ? (notes[0] || "") : `同节次合并(${merged.length})`,
+  };
 }
 
 function buildSlotMap(slots, keyword, weekFilter) {
@@ -496,6 +584,47 @@ function toOptionList(values, emptyLabel) {
   ].join("");
 }
 
+function toOptionListByLabel(options, emptyLabel) {
+  const normalized = options
+    .filter((item) => item && item.value)
+    .sort((left, right) => String(left.label).localeCompare(String(right.label), "zh-CN"));
+
+  return [
+    `<option value="">${escapeHtml(emptyLabel)}</option>`,
+    ...normalized.map(
+      (item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`,
+    ),
+  ].join("");
+}
+
+function toNamedOptions(classes, codeKey, nameKey, fallbackLabel) {
+  const map = new Map();
+
+  for (const item of classes) {
+    const code = String(item[codeKey] ?? "").trim();
+    if (!code) {
+      continue;
+    }
+
+    const name = String(item[nameKey] ?? "").trim();
+    if (!map.has(code)) {
+      map.set(code, new Set());
+    }
+
+    if (name) {
+      map.get(code).add(name);
+    }
+  }
+
+  return Array.from(map.entries()).map(([code, names]) => {
+    const preferredName = Array.from(names)[0] || "";
+    return {
+      value: code,
+      label: preferredName || `${fallbackLabel}（编码 ${code}）`,
+    };
+  });
+}
+
 function normalizeLinkedSelections(dataset) {
   if (!dataset) {
     return;
@@ -516,6 +645,7 @@ function normalizeLinkedSelections(dataset) {
     ? byKeyword.filter((item) => item.grade === state.selectedGrade)
     : byKeyword;
   const collegeOptions = Array.from(new Set(byGrade.map((item) => item.collegeCode).filter(Boolean)));
+  const collegeNamedOptions = toNamedOptions(byGrade, "collegeCode", "collegeName", "未命名学院");
   if (state.selectedCollege && !collegeOptions.includes(state.selectedCollege)) {
     state.selectedCollege = "";
   }
@@ -524,6 +654,7 @@ function normalizeLinkedSelections(dataset) {
     ? byGrade.filter((item) => item.collegeCode === state.selectedCollege)
     : byGrade;
   const majorOptions = Array.from(new Set(byCollege.map((item) => item.majorCode).filter(Boolean)));
+  const majorNamedOptions = toNamedOptions(byCollege, "majorCode", "majorName", "未命名专业");
   if (state.selectedMajor && !majorOptions.includes(state.selectedMajor)) {
     state.selectedMajor = "";
   }
@@ -532,6 +663,7 @@ function normalizeLinkedSelections(dataset) {
     ? byCollege.filter((item) => item.majorCode === state.selectedMajor)
     : byCollege;
   const directionOptions = Array.from(new Set(byMajor.map((item) => item.directionCode).filter(Boolean)));
+  const directionNamedOptions = toNamedOptions(byMajor, "directionCode", "directionName", "未命名方向");
   if (state.selectedDirection && !directionOptions.includes(state.selectedDirection)) {
     state.selectedDirection = "";
   }
@@ -540,15 +672,15 @@ function normalizeLinkedSelections(dataset) {
   gradeSelect.value = state.selectedGrade;
   gradeSelect.disabled = gradeOptions.length <= 1;
 
-  collegeSelect.innerHTML = toOptionList(collegeOptions, "全部学院");
+  collegeSelect.innerHTML = toOptionListByLabel(collegeNamedOptions, "全部学院");
   collegeSelect.value = state.selectedCollege;
   collegeSelect.disabled = collegeOptions.length <= 1;
 
-  majorSelect.innerHTML = toOptionList(majorOptions, "全部专业");
+  majorSelect.innerHTML = toOptionListByLabel(majorNamedOptions, "全部专业");
   majorSelect.value = state.selectedMajor;
   majorSelect.disabled = majorOptions.length <= 1;
 
-  directionSelect.innerHTML = toOptionList(directionOptions, "全部方向");
+  directionSelect.innerHTML = toOptionListByLabel(directionNamedOptions, "全部方向");
   directionSelect.value = state.selectedDirection;
   directionSelect.disabled = directionOptions.length <= 1;
 }
@@ -593,10 +725,13 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
           return '<td class="course-cell"><div class="empty-cell"></div></td>';
         }
 
-        const cards = mergeSlotsForDisplay(slots)
-          .map((slot) => renderCourseCard(slot))
-          .join("");
-        return `<td class="course-cell"><div class="course-stack">${cards}</div></td>`;
+        const displaySlot = collapseSlotsToSingleCard(slots);
+        if (!displaySlot) {
+          return '<td class="course-cell"><div class="empty-cell"></div></td>';
+        }
+
+        const card = renderCourseCard(displaySlot);
+        return `<td class="course-cell"><div class="course-stack">${card}</div></td>`;
       }).join("");
 
       rows.push(`<tr>${sessionCell}${periodCell}${dayCells}</tr>`);
