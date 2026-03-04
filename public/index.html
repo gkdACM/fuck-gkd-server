@@ -15,6 +15,26 @@
 
       <section class="toolbar">
         <label class="control">
+          <span>年级</span>
+          <select id="gradeSelect"></select>
+        </label>
+
+        <label class="control">
+          <span>学院</span>
+          <select id="collegeSelect"></select>
+        </label>
+
+        <label class="control">
+          <span>专业</span>
+          <select id="majorSelect"></select>
+        </label>
+
+        <label class="control">
+          <span>方向</span>
+          <select id="directionSelect"></select>
+        </label>
+
+        <label class="control">
           <span>班级</span>
           <select id="classSelect"></select>
         </label>
@@ -32,6 +52,15 @@
         <label class="control">
           <span>周次筛选</span>
           <input id="weekFilterInput" type="search" placeholder="如 1-9 / 9 / 单周 / 双周" />
+        </label>
+
+        <label class="control">
+          <span>单双周</span>
+          <select id="weekModeSelect">
+            <option value="all">全部周</option>
+            <option value="odd">仅单周</option>
+            <option value="even">仅双周</option>
+          </select>
         </label>
 
         <button id="reloadBtn" type="button">刷新数据</button>

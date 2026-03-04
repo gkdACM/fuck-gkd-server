@@ -3,8 +3,13 @@ const viewTitleNode = document.getElementById("viewTitle");
 const tableContainer = document.getElementById("tableContainer");
 const searchInput = document.getElementById("searchInput");
 const classSelect = document.getElementById("classSelect");
+const gradeSelect = document.getElementById("gradeSelect");
+const collegeSelect = document.getElementById("collegeSelect");
+const majorSelect = document.getElementById("majorSelect");
+const directionSelect = document.getElementById("directionSelect");
 const classFilterInput = document.getElementById("classFilterInput");
 const weekFilterInput = document.getElementById("weekFilterInput");
+const weekModeSelect = document.getElementById("weekModeSelect");
 const reloadButton = document.getElementById("reloadBtn");
 
 const DAYS = [
@@ -31,6 +36,11 @@ const state = {
   currentClassId: "",
   metaVersion: "",
   classFilterKeyword: "",
+  selectedGrade: "",
+  selectedCollege: "",
+  selectedMajor: "",
+  selectedDirection: "",
+  classFilterDebounceTimer: null,
 };
 
 function formatDate(value) {
@@ -142,6 +152,7 @@ function normalizeSlots(slots) {
         courseName,
         teacher: String(slot.teacher ?? "").trim(),
         location: String(slot.location ?? slot.room ?? "").trim(),
+        weekBitmap: String(slot.weekBitmap ?? slot.skzc ?? slot.Skzc ?? "").trim(),
         weeks: String(slot.weeks ?? slot.week ?? "").trim(),
         note: String(slot.note ?? "").trim(),
       };
@@ -174,6 +185,12 @@ function normalizeDataset(raw) {
         id,
         name,
         term,
+        grade: String(item.grade ?? item.njdm ?? "").trim(),
+        collegeCode: String(item.collegeCode ?? item.xsh ?? "").trim(),
+        collegeName: String(item.collegeName ?? item.xsm ?? "").trim(),
+        majorCode: String(item.majorCode ?? item.zyh ?? "").trim(),
+        majorName: String(item.majorName ?? item.zym ?? "").trim(),
+        directionCode: String(item.directionCode ?? item.zyfxh ?? "").trim(),
         slots,
       };
     })
@@ -225,26 +242,15 @@ function renderCourseCard(slot) {
   `;
 }
 
-function parseWeekFilter(text) {
+function parseWeeksFromText(text) {
   const raw = String(text ?? "").trim();
   if (!raw) {
-    return {
-      weeks: null,
-      parity: null,
-      enabled: false,
-      label: "",
-    };
+    return null;
   }
 
   const compact = raw.replaceAll(" ", "").replaceAll("，", ",").replaceAll("至", "-");
-  const parity = compact.includes("单") && !compact.includes("双")
-    ? "odd"
-    : compact.includes("双") && !compact.includes("单")
-      ? "even"
-      : null;
-
   const numberMatches = compact.match(/\d+\s*-\s*\d+|\d+/g) || [];
-  const weeksSet = new Set();
+  const weeks = new Set();
 
   for (const token of numberMatches) {
     if (token.includes("-")) {
@@ -258,7 +264,7 @@ function parseWeekFilter(text) {
       const max = Math.max(start, end);
       for (let week = min; week <= max; week += 1) {
         if (week >= 1 && week <= 30) {
-          weeksSet.add(week);
+          weeks.add(week);
         }
       }
       continue;
@@ -266,62 +272,75 @@ function parseWeekFilter(text) {
 
     const week = Number.parseInt(token, 10);
     if (Number.isFinite(week) && week >= 1 && week <= 30) {
-      weeksSet.add(week);
+      weeks.add(week);
     }
   }
 
+  return weeks.size ? weeks : null;
+}
+
+function parseWeeksFromBitmap(bitmap) {
+  const value = String(bitmap ?? "").trim();
+  if (!value || !/^[01]+$/.test(value)) {
+    return null;
+  }
+
+  const weeks = new Set();
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] === "1") {
+      weeks.add(index + 1);
+    }
+  }
+  return weeks.size ? weeks : null;
+}
+
+function formatWeeksSet(weeksSet) {
+  const sorted = Array.from(weeksSet).sort((left, right) => left - right);
+  if (!sorted.length) {
+    return "";
+  }
+
+  const parts = [];
+  let start = sorted[0];
+  let previous = sorted[0];
+
+  for (let index = 1; index <= sorted.length; index += 1) {
+    const current = sorted[index];
+    if (current === previous + 1) {
+      previous = current;
+      continue;
+    }
+    parts.push(start === previous ? `${start}` : `${start}-${previous}`);
+    start = current;
+    previous = current;
+  }
+
+  return `${parts.join(",")}周`;
+}
+
+function parseWeekFilter(text, mode) {
+  const raw = String(text ?? "").trim();
+  const weeks = parseWeeksFromText(raw);
+  const compact = raw.replaceAll(" ", "");
+  const textParity = compact.includes("单") && !compact.includes("双")
+    ? "odd"
+    : compact.includes("双") && !compact.includes("单")
+      ? "even"
+      : null;
+
+  const parity = mode === "odd" || mode === "even" ? mode : textParity;
   return {
-    weeks: weeksSet.size ? weeksSet : null,
+    weeks,
     parity,
-    enabled: Boolean(parity || weeksSet.size),
-    label: raw,
+    enabled: Boolean(weeks || parity),
+    label: [raw, mode === "odd" ? "仅单周" : mode === "even" ? "仅双周" : ""]
+      .filter(Boolean)
+      .join(" "),
   };
 }
 
-function parseSlotWeeks(text) {
-  const raw = String(text ?? "").trim();
-  if (!raw) {
-    return { weeks: null, parity: null };
-  }
-
-  const compact = raw.replaceAll(" ", "").replaceAll("，", ",").replaceAll("至", "-");
-  const parity = compact.includes("单") && !compact.includes("双")
-    ? "odd"
-    : compact.includes("双") && !compact.includes("单")
-      ? "even"
-      : null;
-
-  const numberMatches = compact.match(/\d+\s*-\s*\d+|\d+/g) || [];
-  const weeksSet = new Set();
-
-  for (const token of numberMatches) {
-    if (token.includes("-")) {
-      const [startRaw, endRaw] = token.split("-");
-      const start = Number.parseInt(startRaw, 10);
-      const end = Number.parseInt(endRaw, 10);
-      if (!Number.isFinite(start) || !Number.isFinite(end)) {
-        continue;
-      }
-      const min = Math.min(start, end);
-      const max = Math.max(start, end);
-      for (let week = min; week <= max; week += 1) {
-        if (week >= 1 && week <= 30) {
-          weeksSet.add(week);
-        }
-      }
-      continue;
-    }
-
-    const week = Number.parseInt(token, 10);
-    if (Number.isFinite(week) && week >= 1 && week <= 30) {
-      weeksSet.add(week);
-    }
-  }
-
-  return {
-    weeks: weeksSet.size ? weeksSet : null,
-    parity,
-  };
+function resolveSlotWeekSet(slot) {
+  return parseWeeksFromBitmap(slot.weekBitmap) || parseWeeksFromText(slot.weeks);
 }
 
 function matchesWeekFilter(slot, filter) {
@@ -329,61 +348,76 @@ function matchesWeekFilter(slot, filter) {
     return true;
   }
 
-  const slotWeeks = parseSlotWeeks(slot.weeks);
-  const hasWeekSet = Boolean(slotWeeks.weeks && slotWeeks.weeks.size);
-  const hasParity = Boolean(slotWeeks.parity);
-
-  if (!hasWeekSet && !hasParity) {
+  const slotWeeks = resolveSlotWeekSet(slot);
+  if (!slotWeeks || !slotWeeks.size) {
     return false;
   }
 
-  const activeWeeks = filter.weeks;
-  if (activeWeeks && hasWeekSet) {
-    let intersects = false;
-    for (const week of activeWeeks) {
-      if (slotWeeks.weeks.has(week)) {
-        intersects = true;
-        break;
+  let candidateWeeks = slotWeeks;
+  if (filter.weeks) {
+    const intersection = new Set();
+    for (const week of slotWeeks) {
+      if (filter.weeks.has(week)) {
+        intersection.add(week);
       }
     }
-    if (!intersects) {
+    if (!intersection.size) {
       return false;
     }
+    candidateWeeks = intersection;
   }
 
-  if (activeWeeks && !hasWeekSet && hasParity) {
-    let parityMatch = false;
-    for (const week of activeWeeks) {
-      const weekParity = week % 2 === 1 ? "odd" : "even";
-      if (weekParity === slotWeeks.parity) {
-        parityMatch = true;
-        break;
-      }
-    }
-    if (!parityMatch) {
-      return false;
-    }
-  }
-
-  if (filter.parity && hasWeekSet) {
-    let parityMatch = false;
-    for (const week of slotWeeks.weeks) {
+  if (filter.parity) {
+    for (const week of candidateWeeks) {
       const weekParity = week % 2 === 1 ? "odd" : "even";
       if (weekParity === filter.parity) {
-        parityMatch = true;
-        break;
+        return true;
       }
     }
-    if (!parityMatch) {
-      return false;
-    }
-  }
-
-  if (filter.parity && !hasWeekSet && hasParity && slotWeeks.parity !== filter.parity) {
     return false;
   }
 
   return true;
+}
+
+function mergeSlotsForDisplay(slots) {
+  const merged = new Map();
+
+  for (const slot of slots) {
+    const key = [slot.courseCode, slot.courseName, slot.teacher, slot.location, slot.note].join("|");
+    if (!merged.has(key)) {
+      merged.set(key, {
+        ...slot,
+        _weeksSet: new Set(),
+        _weeksText: new Set(),
+      });
+    }
+
+    const item = merged.get(key);
+    const parsedWeeks = resolveSlotWeekSet(slot);
+    if (parsedWeeks && parsedWeeks.size) {
+      for (const week of parsedWeeks) {
+        item._weeksSet.add(week);
+      }
+    }
+
+    if (slot.weeks) {
+      item._weeksText.add(slot.weeks);
+    }
+  }
+
+  return Array.from(merged.values()).map((item) => {
+    const weeks = item._weeksSet.size
+      ? formatWeeksSet(item._weeksSet)
+      : Array.from(item._weeksText).join(" + ");
+    const normalized = {
+      ...item,
+      weeks,
+    };
+    delete normalized._weeksSet;
+    delete normalized._weeksText;
+    return normalized;
+  });
 }
 
 function buildSlotMap(slots, keyword, weekFilter) {
@@ -426,14 +460,97 @@ function getFilteredClasses(dataset) {
   }
 
   const keyword = state.classFilterKeyword.trim().toLowerCase();
-  if (!keyword) {
-    return dataset.classes;
-  }
-
   return dataset.classes.filter((item) => {
     const searchable = `${item.id} ${item.name}`.toLowerCase();
-    return searchable.includes(keyword);
+    if (keyword && !searchable.includes(keyword)) {
+      return false;
+    }
+
+    if (state.selectedGrade && item.grade !== state.selectedGrade) {
+      return false;
+    }
+
+    if (state.selectedCollege && item.collegeCode !== state.selectedCollege) {
+      return false;
+    }
+
+    if (state.selectedMajor && item.majorCode !== state.selectedMajor) {
+      return false;
+    }
+
+    if (state.selectedDirection && item.directionCode !== state.selectedDirection) {
+      return false;
+    }
+
+    return true;
   });
+}
+
+function toOptionList(values, emptyLabel) {
+  const unique = Array.from(new Set(values.filter(Boolean)));
+  unique.sort((left, right) => left.localeCompare(right, "zh-CN"));
+
+  return [
+    `<option value="">${escapeHtml(emptyLabel)}</option>`,
+    ...unique.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`),
+  ].join("");
+}
+
+function normalizeLinkedSelections(dataset) {
+  if (!dataset) {
+    return;
+  }
+
+  const classes = dataset.classes;
+  const keyword = state.classFilterKeyword.trim().toLowerCase();
+  const byKeyword = keyword
+    ? classes.filter((item) => `${item.id} ${item.name}`.toLowerCase().includes(keyword))
+    : classes;
+
+  const gradeOptions = Array.from(new Set(byKeyword.map((item) => item.grade).filter(Boolean)));
+  if (state.selectedGrade && !gradeOptions.includes(state.selectedGrade)) {
+    state.selectedGrade = "";
+  }
+
+  const byGrade = state.selectedGrade
+    ? byKeyword.filter((item) => item.grade === state.selectedGrade)
+    : byKeyword;
+  const collegeOptions = Array.from(new Set(byGrade.map((item) => item.collegeCode).filter(Boolean)));
+  if (state.selectedCollege && !collegeOptions.includes(state.selectedCollege)) {
+    state.selectedCollege = "";
+  }
+
+  const byCollege = state.selectedCollege
+    ? byGrade.filter((item) => item.collegeCode === state.selectedCollege)
+    : byGrade;
+  const majorOptions = Array.from(new Set(byCollege.map((item) => item.majorCode).filter(Boolean)));
+  if (state.selectedMajor && !majorOptions.includes(state.selectedMajor)) {
+    state.selectedMajor = "";
+  }
+
+  const byMajor = state.selectedMajor
+    ? byCollege.filter((item) => item.majorCode === state.selectedMajor)
+    : byCollege;
+  const directionOptions = Array.from(new Set(byMajor.map((item) => item.directionCode).filter(Boolean)));
+  if (state.selectedDirection && !directionOptions.includes(state.selectedDirection)) {
+    state.selectedDirection = "";
+  }
+
+  gradeSelect.innerHTML = toOptionList(gradeOptions, "全部年级");
+  gradeSelect.value = state.selectedGrade;
+  gradeSelect.disabled = gradeOptions.length <= 1;
+
+  collegeSelect.innerHTML = toOptionList(collegeOptions, "全部学院");
+  collegeSelect.value = state.selectedCollege;
+  collegeSelect.disabled = collegeOptions.length <= 1;
+
+  majorSelect.innerHTML = toOptionList(majorOptions, "全部专业");
+  majorSelect.value = state.selectedMajor;
+  majorSelect.disabled = majorOptions.length <= 1;
+
+  directionSelect.innerHTML = toOptionList(directionOptions, "全部方向");
+  directionSelect.value = state.selectedDirection;
+  directionSelect.disabled = directionOptions.length <= 1;
 }
 
 function currentClass() {
@@ -476,7 +593,9 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
           return '<td class="course-cell"><div class="empty-cell"></div></td>';
         }
 
-        const cards = slots.map((slot) => renderCourseCard(slot)).join("");
+        const cards = mergeSlotsForDisplay(slots)
+          .map((slot) => renderCourseCard(slot))
+          .join("");
         return `<td class="course-cell"><div class="course-stack">${cards}</div></td>`;
       }).join("");
 
@@ -545,6 +664,8 @@ function renderLegacyTable(data, keyword = "") {
 }
 
 function renderClassOptions(dataset) {
+  normalizeLinkedSelections(dataset);
+
   const filteredClasses = getFilteredClasses(dataset);
 
   if (!filteredClasses.length) {
@@ -581,7 +702,7 @@ function renderGridView() {
     return;
   }
 
-  const weekFilter = parseWeekFilter(weekFilterInput.value);
+  const weekFilter = parseWeekFilter(weekFilterInput.value, weekModeSelect.value);
 
   viewTitleNode.textContent = `${classItem.name}${classItem.term ? ` ${classItem.term}` : ""} 课表`;
   tableContainer.innerHTML = renderGridTable(
@@ -712,11 +833,17 @@ searchInput.addEventListener("input", () => {
 
 classFilterInput.addEventListener("input", () => {
   state.classFilterKeyword = classFilterInput.value;
-
-  if (state.dataset) {
-    renderClassOptions(state.dataset);
-    renderGridView();
+  if (state.classFilterDebounceTimer) {
+    clearTimeout(state.classFilterDebounceTimer);
   }
+
+  state.classFilterDebounceTimer = window.setTimeout(() => {
+    state.classFilterDebounceTimer = null;
+    if (state.dataset) {
+      renderClassOptions(state.dataset);
+      renderGridView();
+    }
+  }, 180);
 });
 
 weekFilterInput.addEventListener("input", () => {
@@ -732,6 +859,50 @@ weekFilterInput.addEventListener("input", () => {
 
 classSelect.addEventListener("change", () => {
   state.currentClassId = classSelect.value;
+  if (state.dataset) {
+    renderGridView();
+  }
+});
+
+gradeSelect.addEventListener("change", () => {
+  state.selectedGrade = gradeSelect.value;
+  state.selectedCollege = "";
+  state.selectedMajor = "";
+  state.selectedDirection = "";
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+collegeSelect.addEventListener("change", () => {
+  state.selectedCollege = collegeSelect.value;
+  state.selectedMajor = "";
+  state.selectedDirection = "";
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+majorSelect.addEventListener("change", () => {
+  state.selectedMajor = majorSelect.value;
+  state.selectedDirection = "";
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+directionSelect.addEventListener("change", () => {
+  state.selectedDirection = directionSelect.value;
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+weekModeSelect.addEventListener("change", () => {
   if (state.dataset) {
     renderGridView();
   }

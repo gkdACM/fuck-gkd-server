@@ -122,6 +122,7 @@ def _slot_from_row(row: dict[str, Any]) -> dict[str, str] | None:
         "courseName": course_name,
         "teacher": str(row.get("Jsms") or "").strip(),
         "location": str(row.get("Dd") or "").strip(),
+        "weekBitmap": str(row.get("Skzc") or "").strip(),
         "weeks": str(row.get("Zcsm") or "").strip(),
         "note": str(row.get("Kxh") or "").strip(),
     }
@@ -175,6 +176,12 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                     "id": class_id,
                     "name": class_name,
                     "term": semester,
+                    "grade": str(meta.get("njdm") or "").strip(),
+                    "collegeCode": str(meta.get("xsh") or "").strip(),
+                    "majorCode": str(meta.get("zyh") or "").strip(),
+                    "directionCode": str(meta.get("zyfxh") or "").strip(),
+                    "collegeName": "",
+                    "majorName": "",
                     "slots": [],
                     "_seen": set(),
                 }
@@ -195,6 +202,20 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                 if not slot:
                     continue
 
+                if not class_item.get("collegeName"):
+                    class_item["collegeName"] = str(row.get("Xsm") or row.get("Xsjc") or "").strip()
+                if not class_item.get("majorName"):
+                    class_item["majorName"] = str(row.get("Zym") or "").strip()
+
+                if not class_item.get("grade"):
+                    class_item["grade"] = str(row.get("Njdm") or row.get("njdm") or "").strip()
+                if not class_item.get("collegeCode"):
+                    class_item["collegeCode"] = str(row.get("Xsh") or row.get("xsh") or "").strip()
+                if not class_item.get("majorCode"):
+                    class_item["majorCode"] = str(row.get("Zyh") or row.get("zyh") or "").strip()
+                if not class_item.get("directionCode"):
+                    class_item["directionCode"] = str(row.get("zyfxh") or row.get("Zyfxh") or "").strip()
+
                 periods.add(slot["period"])
                 unique_key = (
                     slot["day"],
@@ -203,6 +224,7 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                     slot["courseName"],
                     slot["teacher"],
                     slot["location"],
+                    slot["weekBitmap"],
                     slot["weeks"],
                 )
                 seen = class_item["_seen"]
