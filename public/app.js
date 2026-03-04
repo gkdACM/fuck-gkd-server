@@ -3,6 +3,8 @@ const viewTitleNode = document.getElementById("viewTitle");
 const tableContainer = document.getElementById("tableContainer");
 const searchInput = document.getElementById("searchInput");
 const classSelect = document.getElementById("classSelect");
+const classFilterInput = document.getElementById("classFilterInput");
+const weekFilterInput = document.getElementById("weekFilterInput");
 const reloadButton = document.getElementById("reloadBtn");
 
 const DAYS = [
@@ -28,6 +30,7 @@ const state = {
   legacyData: null,
   currentClassId: "",
   metaVersion: "",
+  classFilterKeyword: "",
 };
 
 function formatDate(value) {
@@ -222,7 +225,168 @@ function renderCourseCard(slot) {
   `;
 }
 
-function buildSlotMap(slots, keyword) {
+function parseWeekFilter(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) {
+    return {
+      weeks: null,
+      parity: null,
+      enabled: false,
+      label: "",
+    };
+  }
+
+  const compact = raw.replaceAll(" ", "").replaceAll("，", ",").replaceAll("至", "-");
+  const parity = compact.includes("单") && !compact.includes("双")
+    ? "odd"
+    : compact.includes("双") && !compact.includes("单")
+      ? "even"
+      : null;
+
+  const numberMatches = compact.match(/\d+\s*-\s*\d+|\d+/g) || [];
+  const weeksSet = new Set();
+
+  for (const token of numberMatches) {
+    if (token.includes("-")) {
+      const [startRaw, endRaw] = token.split("-");
+      const start = Number.parseInt(startRaw, 10);
+      const end = Number.parseInt(endRaw, 10);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        continue;
+      }
+      const min = Math.min(start, end);
+      const max = Math.max(start, end);
+      for (let week = min; week <= max; week += 1) {
+        if (week >= 1 && week <= 30) {
+          weeksSet.add(week);
+        }
+      }
+      continue;
+    }
+
+    const week = Number.parseInt(token, 10);
+    if (Number.isFinite(week) && week >= 1 && week <= 30) {
+      weeksSet.add(week);
+    }
+  }
+
+  return {
+    weeks: weeksSet.size ? weeksSet : null,
+    parity,
+    enabled: Boolean(parity || weeksSet.size),
+    label: raw,
+  };
+}
+
+function parseSlotWeeks(text) {
+  const raw = String(text ?? "").trim();
+  if (!raw) {
+    return { weeks: null, parity: null };
+  }
+
+  const compact = raw.replaceAll(" ", "").replaceAll("，", ",").replaceAll("至", "-");
+  const parity = compact.includes("单") && !compact.includes("双")
+    ? "odd"
+    : compact.includes("双") && !compact.includes("单")
+      ? "even"
+      : null;
+
+  const numberMatches = compact.match(/\d+\s*-\s*\d+|\d+/g) || [];
+  const weeksSet = new Set();
+
+  for (const token of numberMatches) {
+    if (token.includes("-")) {
+      const [startRaw, endRaw] = token.split("-");
+      const start = Number.parseInt(startRaw, 10);
+      const end = Number.parseInt(endRaw, 10);
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        continue;
+      }
+      const min = Math.min(start, end);
+      const max = Math.max(start, end);
+      for (let week = min; week <= max; week += 1) {
+        if (week >= 1 && week <= 30) {
+          weeksSet.add(week);
+        }
+      }
+      continue;
+    }
+
+    const week = Number.parseInt(token, 10);
+    if (Number.isFinite(week) && week >= 1 && week <= 30) {
+      weeksSet.add(week);
+    }
+  }
+
+  return {
+    weeks: weeksSet.size ? weeksSet : null,
+    parity,
+  };
+}
+
+function matchesWeekFilter(slot, filter) {
+  if (!filter || !filter.enabled) {
+    return true;
+  }
+
+  const slotWeeks = parseSlotWeeks(slot.weeks);
+  const hasWeekSet = Boolean(slotWeeks.weeks && slotWeeks.weeks.size);
+  const hasParity = Boolean(slotWeeks.parity);
+
+  if (!hasWeekSet && !hasParity) {
+    return false;
+  }
+
+  const activeWeeks = filter.weeks;
+  if (activeWeeks && hasWeekSet) {
+    let intersects = false;
+    for (const week of activeWeeks) {
+      if (slotWeeks.weeks.has(week)) {
+        intersects = true;
+        break;
+      }
+    }
+    if (!intersects) {
+      return false;
+    }
+  }
+
+  if (activeWeeks && !hasWeekSet && hasParity) {
+    let parityMatch = false;
+    for (const week of activeWeeks) {
+      const weekParity = week % 2 === 1 ? "odd" : "even";
+      if (weekParity === slotWeeks.parity) {
+        parityMatch = true;
+        break;
+      }
+    }
+    if (!parityMatch) {
+      return false;
+    }
+  }
+
+  if (filter.parity && hasWeekSet) {
+    let parityMatch = false;
+    for (const week of slotWeeks.weeks) {
+      const weekParity = week % 2 === 1 ? "odd" : "even";
+      if (weekParity === filter.parity) {
+        parityMatch = true;
+        break;
+      }
+    }
+    if (!parityMatch) {
+      return false;
+    }
+  }
+
+  if (filter.parity && !hasWeekSet && hasParity && slotWeeks.parity !== filter.parity) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildSlotMap(slots, keyword, weekFilter) {
   const lowered = keyword.trim().toLowerCase();
   const map = new Map();
 
@@ -242,6 +406,10 @@ function buildSlotMap(slots, keyword) {
       continue;
     }
 
+    if (!matchesWeekFilter(slot, weekFilter)) {
+      continue;
+    }
+
     const key = `${slot.period}|${slot.day}`;
     if (!map.has(key)) {
       map.set(key, []);
@@ -252,19 +420,40 @@ function buildSlotMap(slots, keyword) {
   return map;
 }
 
+function getFilteredClasses(dataset) {
+  if (!dataset) {
+    return [];
+  }
+
+  const keyword = state.classFilterKeyword.trim().toLowerCase();
+  if (!keyword) {
+    return dataset.classes;
+  }
+
+  return dataset.classes.filter((item) => {
+    const searchable = `${item.id} ${item.name}`.toLowerCase();
+    return searchable.includes(keyword);
+  });
+}
+
 function currentClass() {
   if (!state.dataset) {
     return null;
   }
 
+  const filteredClasses = getFilteredClasses(state.dataset);
+  if (!filteredClasses.length) {
+    return null;
+  }
+
   return (
-    state.dataset.classes.find((item) => item.id === state.currentClassId) ||
-    state.dataset.classes[0]
+    filteredClasses.find((item) => item.id === state.currentClassId) ||
+    filteredClasses[0]
   );
 }
 
-function renderGridTable(classItem, periods, keyword) {
-  const slotMap = buildSlotMap(classItem.slots, keyword);
+function renderGridTable(classItem, periods, keyword, weekFilter) {
+  const slotMap = buildSlotMap(classItem.slots, keyword, weekFilter);
   const groups = groupPeriods(periods);
 
   const headerCells = DAYS.map((day) => `<th>${escapeHtml(day)}</th>`).join("");
@@ -356,39 +545,57 @@ function renderLegacyTable(data, keyword = "") {
 }
 
 function renderClassOptions(dataset) {
-  classSelect.innerHTML = dataset.classes
+  const filteredClasses = getFilteredClasses(dataset);
+
+  if (!filteredClasses.length) {
+    classSelect.innerHTML = '<option value="">无匹配班级</option>';
+    classSelect.value = "";
+    classSelect.disabled = true;
+    state.currentClassId = "";
+    return;
+  }
+
+  classSelect.innerHTML = filteredClasses
     .map(
       (item) =>
         `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`,
     )
     .join("");
 
-  const hasSelected = dataset.classes.some((item) => item.id === state.currentClassId);
+  const hasSelected = filteredClasses.some((item) => item.id === state.currentClassId);
   if (!hasSelected) {
-    state.currentClassId = dataset.classes[0].id;
+    state.currentClassId = filteredClasses[0].id;
   }
   classSelect.value = state.currentClassId;
-  classSelect.disabled = dataset.classes.length <= 1;
+  classSelect.disabled = filteredClasses.length <= 1;
 }
 
 function renderGridView() {
   const dataset = state.dataset;
   const classItem = currentClass();
   if (!dataset || !classItem) {
-    tableContainer.innerHTML = '<div class="empty">没有可展示的课表数据</div>';
+    const emptyText = state.classFilterKeyword
+      ? "没有匹配班级，请修改班级检索关键字"
+      : "没有可展示的课表数据";
+    tableContainer.innerHTML = `<div class="empty">${escapeHtml(emptyText)}</div>`;
     return;
   }
+
+  const weekFilter = parseWeekFilter(weekFilterInput.value);
 
   viewTitleNode.textContent = `${classItem.name}${classItem.term ? ` ${classItem.term}` : ""} 课表`;
   tableContainer.innerHTML = renderGridTable(
     classItem,
     dataset.periods,
     searchInput.value,
+    weekFilter,
   );
 
   const updateText = formatDate(dataset.generated_at);
+  const filteredClasses = getFilteredClasses(dataset);
+  const filterText = weekFilter.enabled ? `｜周次筛选：${weekFilter.label}` : "";
   setStatus(
-    `更新时间：${updateText}｜班级数：${dataset.classes.length}｜当前：${classItem.name}｜版本：${state.metaVersion || "-"}`,
+    `更新时间：${updateText}｜班级：${filteredClasses.length}/${dataset.classes.length}｜当前：${classItem.name}${filterText}｜版本：${state.metaVersion || "-"}`,
   );
 }
 
@@ -493,6 +700,26 @@ async function loadTimetable() {
 }
 
 searchInput.addEventListener("input", () => {
+  if (state.dataset) {
+    renderGridView();
+    return;
+  }
+
+  if (state.legacyData) {
+    renderLegacyTable(state.legacyData, searchInput.value);
+  }
+});
+
+classFilterInput.addEventListener("input", () => {
+  state.classFilterKeyword = classFilterInput.value;
+
+  if (state.dataset) {
+    renderClassOptions(state.dataset);
+    renderGridView();
+  }
+});
+
+weekFilterInput.addEventListener("input", () => {
   if (state.dataset) {
     renderGridView();
     return;

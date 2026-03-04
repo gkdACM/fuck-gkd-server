@@ -6,7 +6,7 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
-  background: radial-gradient(circle at top, #101b2d 0%, #080d14 55%);
+  background: radial-gradient(circle at top, #13233a 0%, #090f19 58%);
   color: #d7e5f3;
 }
 
@@ -34,9 +34,10 @@ h1 {
 }
 
 .toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr 1.7fr 1.2fr auto;
   align-items: end;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 20px;
   padding: 14px;
   border-radius: 12px;
@@ -48,7 +49,7 @@ h1 {
 .control {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .control > span {
@@ -64,7 +65,7 @@ select,
 input[type="search"] {
   border: 1px solid #2b3b4f;
   border-radius: 9px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   font-size: 13px;
   color: #d5e3f0;
   background: #0f1724;
@@ -80,7 +81,7 @@ input[type="search"]:focus {
 button {
   border: none;
   border-radius: 9px;
-  padding: 10px 16px;
+  padding: 9px 14px;
   background: #2b6ceb;
   color: #fff;
   cursor: pointer;
@@ -103,15 +104,15 @@ button:hover {
 .legacy-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1080px;
+  min-width: 1000px;
 }
 
 .schedule-table thead th,
 .legacy-table thead th {
-  background: #060a10;
+  background: #070e17;
   color: #eef2f7;
   border: 1px solid #2a3b51;
-  padding: 10px 8px;
+  padding: 9px 8px;
   font-size: 14px;
   text-align: center;
   font-weight: 700;
@@ -134,7 +135,7 @@ button:hover {
 }
 
 .schedule-table .session-cell {
-  min-width: 74px;
+  min-width: 68px;
   text-align: center;
   font-weight: 700;
   background: #081019;
@@ -142,69 +143,69 @@ button:hover {
   writing-mode: vertical-rl;
   text-orientation: upright;
   letter-spacing: 1px;
-  padding: 8px 6px;
+  padding: 7px 6px;
 }
 
 .schedule-table .period-cell {
-  min-width: 62px;
+  min-width: 58px;
   text-align: center;
   font-weight: 700;
   background: #0c1624;
   color: #d9e6f3;
-  padding: 8px 6px;
+  padding: 7px 6px;
 }
 
 .schedule-table .course-cell {
   width: 14.28%;
-  min-width: 156px;
-  min-height: 104px;
-  padding: 6px;
+  min-width: 142px;
+  min-height: 84px;
+  padding: 5px;
   background: linear-gradient(180deg, #102332 0%, #0f202f 100%);
 }
 
 .course-stack {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
 .course-card {
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid #2a516f;
   background: rgba(13, 39, 60, 0.8);
-  padding: 8px;
-  min-height: 88px;
-  line-height: 1.32;
+  padding: 6px 7px;
+  min-height: 68px;
+  line-height: 1.28;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .course-code {
   color: #f5968a;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.2px;
 }
 
 .course-name {
   color: #9cb3ff;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
-  margin: 2px 0 3px;
+  margin: 2px 0;
 }
 
 .course-meta {
   color: #66c6ea;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .course-meta-sub {
   color: #71d6ca;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .empty-cell {
-  min-height: 88px;
-  border-radius: 10px;
+  min-height: 66px;
+  border-radius: 8px;
   border: 1px dashed #27435d;
   background: rgba(12, 24, 37, 0.46);
 }
@@ -227,6 +228,7 @@ button:hover {
 
 @media (max-width: 960px) {
   .toolbar {
+    display: flex;
     flex-wrap: wrap;
   }
 
