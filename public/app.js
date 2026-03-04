@@ -6,7 +6,6 @@ const classSelect = document.getElementById("classSelect");
 const gradeSelect = document.getElementById("gradeSelect");
 const collegeSelect = document.getElementById("collegeSelect");
 const majorSelect = document.getElementById("majorSelect");
-const directionSelect = document.getElementById("directionSelect");
 const classFilterInput = document.getElementById("classFilterInput");
 const weekFilterInput = document.getElementById("weekFilterInput");
 const weekNumberSelect = document.getElementById("weekNumberSelect");
@@ -104,7 +103,6 @@ const state = {
   selectedGrade: "",
   selectedCollege: "",
   selectedMajor: "",
-  selectedDirection: "",
   selectedWeekNumber: "",
   compactMode: true,
   enableIcs: false,
@@ -156,7 +154,6 @@ function getHashState() {
     g: params.get("g") || "",
     co: params.get("co") || "",
     m: params.get("m") || "",
-    d: params.get("d") || "",
     cp: params.get("cp") || "1",
     ei: params.get("ei") || "0",
     ts: params.get("ts") || "",
@@ -180,7 +177,6 @@ function applyHashStateToControls() {
   state.selectedGrade = hashState.g;
   state.selectedCollege = hashState.co;
   state.selectedMajor = hashState.m;
-  state.selectedDirection = hashState.d;
   state.compactMode = compactToggle.checked;
   state.enableIcs = enableIcsToggle.checked;
   state.termStartDate = hashState.ts;
@@ -205,7 +201,6 @@ function writeHashStateNow() {
   put("g", state.selectedGrade);
   put("co", state.selectedCollege);
   put("m", state.selectedMajor);
-  put("d", state.selectedDirection);
   put("cp", state.compactMode ? "1" : "0");
   put("ei", state.enableIcs ? "1" : "0");
   put("ts", state.termStartDate);
@@ -718,13 +713,6 @@ function getFilteredClasses(dataset) {
       return false;
     }
 
-    if (
-      state.selectedDirection
-      && resolveDirectionFilterValue(item, "未命名方向") !== state.selectedDirection
-    ) {
-      return false;
-    }
-
     return true;
   });
 }
@@ -750,39 +738,6 @@ function toOptionListByLabel(options, emptyLabel) {
       (item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`,
     ),
   ].join("");
-}
-
-function resolveDirectionFilterValue(item, fallbackLabel = "未命名方向") {
-  const name = String(item?.directionName ?? "").trim();
-  if (name) {
-    return name;
-  }
-
-  const code = String(item?.directionCode ?? "").trim();
-  if (code) {
-    return `${fallbackLabel}（编码 ${code}）`;
-  }
-
-  return fallbackLabel;
-}
-
-function toDirectionNamedOptions(classes, fallbackLabel = "未命名方向") {
-  const labels = new Set();
-
-  for (const item of classes) {
-    const directionCode = String(item?.directionCode ?? "").trim();
-    const directionName = String(item?.directionName ?? "").trim();
-    if (!directionCode && !directionName) {
-      continue;
-    }
-
-    labels.add(resolveDirectionFilterValue(item, fallbackLabel));
-  }
-
-  return Array.from(labels).map((label) => ({
-    value: label,
-    label,
-  }));
 }
 
 function toNamedOptions(classes, codeKey, nameKey, fallbackLabel) {
@@ -847,15 +802,6 @@ function normalizeLinkedSelections(dataset) {
     state.selectedMajor = "";
   }
 
-  const byMajor = state.selectedMajor
-    ? byCollege.filter((item) => item.majorCode === state.selectedMajor)
-    : byCollege;
-  const directionNamedOptions = toDirectionNamedOptions(byMajor, "未命名方向");
-  const directionOptions = directionNamedOptions.map((item) => item.value);
-  if (state.selectedDirection && !directionOptions.includes(state.selectedDirection)) {
-    state.selectedDirection = "";
-  }
-
   gradeSelect.innerHTML = toOptionList(gradeOptions, "全部年级");
   gradeSelect.value = state.selectedGrade;
   gradeSelect.disabled = gradeOptions.length <= 1;
@@ -867,10 +813,6 @@ function normalizeLinkedSelections(dataset) {
   majorSelect.innerHTML = toOptionListByLabel(majorNamedOptions, "全部专业");
   majorSelect.value = state.selectedMajor;
   majorSelect.disabled = majorOptions.length <= 1;
-
-  directionSelect.innerHTML = toOptionListByLabel(directionNamedOptions, "全部方向");
-  directionSelect.value = state.selectedDirection;
-  directionSelect.disabled = directionOptions.length <= 1;
 }
 
 function currentClass() {
@@ -1547,7 +1489,6 @@ gradeSelect.addEventListener("change", () => {
   state.selectedGrade = gradeSelect.value;
   state.selectedCollege = "";
   state.selectedMajor = "";
-  state.selectedDirection = "";
   if (state.dataset) {
     renderClassOptions(state.dataset);
     renderGridView();
@@ -1558,7 +1499,6 @@ gradeSelect.addEventListener("change", () => {
 collegeSelect.addEventListener("change", () => {
   state.selectedCollege = collegeSelect.value;
   state.selectedMajor = "";
-  state.selectedDirection = "";
   if (state.dataset) {
     renderClassOptions(state.dataset);
     renderGridView();
@@ -1568,16 +1508,6 @@ collegeSelect.addEventListener("change", () => {
 
 majorSelect.addEventListener("change", () => {
   state.selectedMajor = majorSelect.value;
-  state.selectedDirection = "";
-  if (state.dataset) {
-    renderClassOptions(state.dataset);
-    renderGridView();
-  }
-  scheduleHashSync();
-});
-
-directionSelect.addEventListener("change", () => {
-  state.selectedDirection = directionSelect.value;
   if (state.dataset) {
     renderClassOptions(state.dataset);
     renderGridView();

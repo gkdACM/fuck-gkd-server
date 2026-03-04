@@ -30,11 +30,6 @@
         </label>
 
         <label class="control">
-          <span>方向</span>
-          <select id="directionSelect"></select>
-        </label>
-
-        <label class="control">
           <span>班级</span>
           <select id="classSelect"></select>
         </label>
@@ -75,8 +70,6 @@
           <input id="compactToggle" type="checkbox" checked />
         </label>
 
-        <button id="exportCsvBtn" type="button">导出 CSV</button>
-
         <label class="control control-inline">
           <span>启用 ICS</span>
           <input id="enableIcsToggle" type="checkbox" />
@@ -87,9 +80,11 @@
           <input id="termStartInput" type="date" />
         </label>
 
-        <button id="exportIcsBtn" type="button" disabled>导出 ICS</button>
-
-        <button id="reloadBtn" type="button">刷新数据</button>
+        <div class="toolbar-actions">
+          <button id="exportCsvBtn" type="button">导出 CSV</button>
+          <button id="exportIcsBtn" type="button" disabled>导出 ICS</button>
+          <button id="reloadBtn" type="button">刷新数据</button>
+        </div>
       </section>
 
       <section id="tableContainer" class="table-wrap"></section>
