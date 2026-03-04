@@ -107,7 +107,7 @@ const state = {
   selectedCollege: "",
   selectedMajor: "",
   selectedWeekNumber: "",
-  compactMode: true,
+  compactMode: false,
   enableIcs: false,
   termStartDate: "",
   classFilterDebounceTimer: null,
