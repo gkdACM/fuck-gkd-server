@@ -1,0 +1,145 @@
+{
+  "semester": "2025-2026-2-1",
+  "failed": [
+    {
+      "bjh": "251711402",
+      "error": "AbortError: signal is aborted without reason",
+      "meta": {
+        "bjh": "251711402",
+        "bm": "法律2502B班",
+        "njdm": "2025",
+        "xsh": "10317",
+        "zyh": "1711",
+        "zyfxh": "",
+        "id": "2025_10317_1711_251711402",
+        "pId": "2025_10317_1711"
+      }
+    },
+    {
+      "bjh": "251721403",
+      "error": "AbortError: signal is aborted without reason",
+      "meta": {
+        "bjh": "251721403",
+        "bm": "法律2503D班",
+        "njdm": "2025",
+        "xsh": "10317",
+        "zyh": "1711",
+        "zyfxh": "",
+        "id": "2025_10317_1711_251721403",
+        "pId": "2025_10317_1711"
+      }
+    },
+    {
+      "bjh": "20会计G1",
+      "error": "AbortError: signal is aborted without reason",
+      "meta": {
+        "bjh": "20会计G1",
+        "bm": "20会计G1",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "110",
+        "id": "2020_10310_11_110_zf_20会计G1",
+        "pId": "2020_10310_11_110_zf"
+      }
+    },
+    {
+      "bjh": "20会计G2",
+      "error": "AbortError: signal is aborted without reason",
+      "meta": {
+        "bjh": "20会计G2",
+        "bm": "20会计G2",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "110",
+        "id": "2020_10310_11_110_zf_20会计G2",
+        "pId": "2020_10310_11_110_zf"
+      }
+    },
+    {
+      "bjh": "20会计D",
+      "error": "AbortError: signal is aborted without reason",
+      "meta": {
+        "bjh": "20会计D",
+        "bm": "20会计D",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "111",
+        "id": "2020_10310_11_111_zf_20会计D",
+        "pId": "2020_10310_11_111_zf"
+      }
+    },
+    {
+      "bjh": "20会计实务G1",
+      "error": "TypeError: Failed to fetch",
+      "meta": {
+        "bjh": "20会计实务G1",
+        "bm": "20会计实务G1",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "112",
+        "id": "2020_10310_11_112_zf_20会计实务G1",
+        "pId": "2020_10310_11_112_zf"
+      }
+    },
+    {
+      "bjh": "20会计实务G2",
+      "error": "TypeError: Failed to fetch",
+      "meta": {
+        "bjh": "20会计实务G2",
+        "bm": "20会计实务G2",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "112",
+        "id": "2020_10310_11_112_zf_20会计实务G2",
+        "pId": "2020_10310_11_112_zf"
+      }
+    },
+    {
+      "bjh": "20会计实务G3",
+      "error": "TypeError: Failed to fetch",
+      "meta": {
+        "bjh": "20会计实务G3",
+        "bm": "20会计实务G3",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "112",
+        "id": "2020_10310_11_112_zf_20会计实务G3",
+        "pId": "2020_10310_11_112_zf"
+      }
+    },
+    {
+      "bjh": "20会计实务G4",
+      "error": "TypeError: Failed to fetch",
+      "meta": {
+        "bjh": "20会计实务G4",
+        "bm": "20会计实务G4",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "112",
+        "id": "2020_10310_11_112_zf_20会计实务G4",
+        "pId": "2020_10310_11_112_zf"
+      }
+    },
+    {
+      "bjh": "20注会G1",
+      "error": "TypeError: Failed to fetch",
+      "meta": {
+        "bjh": "20注会G1",
+        "bm": "20注会G1",
+        "njdm": "2020",
+        "xsh": "10310",
+        "zyh": "11",
+        "zyfxh": "113",
+        "id": "2020_10310_11_113_zf_20注会G1",
+        "pId": "2020_10310_11_113_zf"
+      }
+    }
+  ]
+}

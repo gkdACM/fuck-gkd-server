@@ -1,6 +1,7 @@
 const statusNode = document.getElementById("status");
 const viewTitleNode = document.getElementById("viewTitle");
 const tableContainer = document.getElementById("tableContainer");
+const todaySchedule = document.getElementById("todaySchedule");
 const searchInput = document.getElementById("searchInput");
 const classSelect = document.getElementById("classSelect");
 const gradeSelect = document.getElementById("gradeSelect");
@@ -363,19 +364,124 @@ function groupPeriods(periods) {
   return groups;
 }
 
+const ICONS = {
+  location: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+  teacher: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+  weeks: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
+};
+
+function getCourseColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  // Use HSL for better control: Hue varies, Saturation ~70%, Lightness ~40% for dark mode
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 65%, 40%)`;
+}
+
+function getTodayIndex() {
+  const day = new Date().getDay(); // 0 is Sunday
+  return day === 0 ? 6 : day - 1;
+}
+
+function renderTodaySchedule(classItem, dataset, weekFilter) {
+  if (!classItem || !dataset) {
+    todaySchedule.classList.add("hidden");
+    return;
+  }
+
+  const todayIndex = getTodayIndex();
+  const todayLabel = DAYS[todayIndex];
+  
+  // Reuse buildSlotMap but filter for today
+  const slotMap = buildSlotMap(classItem.slots, "", weekFilter);
+  const periods = dataset.periods;
+  
+  const todaySlots = [];
+  for (const period of periods) {
+    const key = `${period.id}|${todayLabel}`;
+    const slots = slotMap.get(key) || [];
+    if (slots.length > 0) {
+      const merged = mergeSlotsForDisplay(slots);
+      todaySlots.push({ period, items: merged });
+    }
+  }
+
+  if (todaySlots.length === 0) {
+    todaySchedule.innerHTML = `
+      <div class="today-empty">
+        <div class="today-header">📅 今日日程 (${todayLabel})</div>
+        <div class="today-content">今日无课，好好休息！</div>
+      </div>
+    `;
+    todaySchedule.classList.remove("hidden");
+    return;
+  }
+
+  const cardsHtml = todaySlots.map(group => {
+    return group.items.map(item => {
+      const color = getCourseColor(item.courseName);
+      return `
+        <div class="today-card" style="border-left-color: ${color}">
+          <div class="today-time">
+            <span class="period-badge">${group.period.label}</span>
+            <span class="session-label">${group.period.session}</span>
+          </div>
+          <div class="today-info">
+            <div class="today-course">${escapeHtml(item.courseName)}</div>
+            <div class="today-meta">
+              <span class="meta-item">📍 ${escapeHtml(item.location || "未知")}</span>
+              <span class="meta-item">👤 ${escapeHtml(item.teacher || "待定")}</span>
+              ${item.weeks ? `<span class="meta-item">📅 ${escapeHtml(item.weeks)}</span>` : ""}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }).join("");
+
+  todaySchedule.innerHTML = `
+    <div class="today-container">
+      <div class="today-header">📅 今日日程 (${todayLabel})</div>
+      <div class="today-grid">
+        ${cardsHtml}
+      </div>
+    </div>
+  `;
+  todaySchedule.classList.remove("hidden");
+}
+
 function renderCourseCard(slot, registryKey) {
   const codeText = slot.courseCode
     ? `[${escapeHtml(slot.courseCode)}]`
-    : "[未设置编码]";
-  const detailLine = [slot.teacher, slot.weeks, slot.note].filter(Boolean).join(" ");
+    : "";
+  
   const compactClass = state.compactMode ? "course-card compact" : "course-card";
-
+  const bgColor = getCourseColor(slot.courseName);
+  
+  // New layout: Name (primary), then grid of meta info with icons
   return `
-    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}">
-      <div class="course-code">${codeText}</div>
-      <div class="course-name">${escapeHtml(slot.courseName)}</div>
-      <div class="course-meta">${escapeHtml(slot.location || "地点待补充")}</div>
-      <div class="course-meta-sub">${escapeHtml(detailLine || "信息待补充")}</div>
+    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};">
+      <div class="course-header">
+        <span class="course-name" title="${escapeHtml(slot.courseName)}">${escapeHtml(slot.courseName)}</span>
+        <span class="course-code-pill">${codeText}</span>
+      </div>
+      
+      <div class="course-body">
+        <div class="meta-row" title="地点">
+          ${ICONS.location}
+          <span>${escapeHtml(slot.location || "待定")}</span>
+        </div>
+        <div class="meta-row" title="教师">
+          ${ICONS.teacher}
+          <span>${escapeHtml(slot.teacher || "待定")}</span>
+        </div>
+        <div class="meta-row" title="周次">
+          ${ICONS.weeks}
+          <span>${escapeHtml(slot.weeks || "")}</span>
+        </div>
+      </div>
     </button>
   `;
 }
@@ -900,7 +1006,7 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
           .map((item) => renderCourseCard(item, registryKey))
           .join("");
         const moreButton = hiddenCount
-          ? `<button type="button" class="more-courses-btn" data-open-slot="${escapeHtml(registryKey)}">+${hiddenCount}</button>`
+          ? `<button type="button" class="more-courses-btn" data-open-slot="${escapeHtml(registryKey)}">+${hiddenCount} 门课</button>`
           : "";
 
         return `<td class="course-cell"><div class="course-stack">${cardsHtml}${moreButton}</div></td>`;
@@ -1065,6 +1171,10 @@ function renderGridView() {
     searchInput.value,
     weekFilter,
   );
+  
+  // Render Today's Schedule
+  renderTodaySchedule(classItem, dataset, weekFilter);
+
   tableContainer.innerHTML = rendered.html;
   state.cardRegistry = rendered.cardRegistry;
   state.lastRenderedRows = getVisibleMergedRows(classItem, searchInput.value, weekFilter);
