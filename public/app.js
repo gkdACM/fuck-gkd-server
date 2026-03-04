@@ -566,7 +566,10 @@ function getFilteredClasses(dataset) {
       return false;
     }
 
-    if (state.selectedDirection && item.directionCode !== state.selectedDirection) {
+    if (
+      state.selectedDirection &&
+      resolveDirectionFilterValue(item, "未命名方向") !== state.selectedDirection
+    ) {
       return false;
     }
 
@@ -595,6 +598,39 @@ function toOptionListByLabel(options, emptyLabel) {
       (item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`,
     ),
   ].join("");
+}
+
+function resolveDirectionFilterValue(item, fallbackLabel = "未命名方向") {
+  const name = String(item?.directionName ?? "").trim();
+  if (name) {
+    return name;
+  }
+
+  const code = String(item?.directionCode ?? "").trim();
+  if (code) {
+    return `${fallbackLabel}（编码 ${code}）`;
+  }
+
+  return fallbackLabel;
+}
+
+function toDirectionNamedOptions(classes, fallbackLabel = "未命名方向") {
+  const labels = new Set();
+
+  for (const item of classes) {
+    const directionCode = String(item?.directionCode ?? "").trim();
+    const directionName = String(item?.directionName ?? "").trim();
+    if (!directionCode && !directionName) {
+      continue;
+    }
+
+    labels.add(resolveDirectionFilterValue(item, fallbackLabel));
+  }
+
+  return Array.from(labels).map((label) => ({
+    value: label,
+    label,
+  }));
 }
 
 function toNamedOptions(classes, codeKey, nameKey, fallbackLabel) {
@@ -662,8 +698,8 @@ function normalizeLinkedSelections(dataset) {
   const byMajor = state.selectedMajor
     ? byCollege.filter((item) => item.majorCode === state.selectedMajor)
     : byCollege;
-  const directionOptions = Array.from(new Set(byMajor.map((item) => item.directionCode).filter(Boolean)));
-  const directionNamedOptions = toNamedOptions(byMajor, "directionCode", "directionName", "未命名方向");
+  const directionNamedOptions = toDirectionNamedOptions(byMajor, "未命名方向");
+  const directionOptions = directionNamedOptions.map((item) => item.value);
   if (state.selectedDirection && !directionOptions.includes(state.selectedDirection)) {
     state.selectedDirection = "";
   }
