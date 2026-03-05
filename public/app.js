@@ -185,7 +185,7 @@ function getHashState() {
     g: params.get("g") || "",
     co: params.get("co") || "",
     m: params.get("m") || "",
-    cp: params.get("cp") || "1",
+    cp: params.get("cp") || "0",
     ei: params.get("ei") || "0",
     ts: params.get("ts") || "",
   };
