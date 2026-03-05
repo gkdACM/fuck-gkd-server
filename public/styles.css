@@ -215,7 +215,7 @@ button:disabled {
   min-width: 160px;
   min-height: 120px;
   padding: 4px;
-  /* background: linear-gradient(180deg, #102332 0%, #0f202f 100%); */
+  background: transparent;
 }
 
 .course-stack {
@@ -789,10 +789,11 @@ button:disabled {
 }
 
 .empty-cell {
-  min-height: 66px;
+  min-height: 120px;
+  height: 100%;
   border-radius: 8px;
-  border: 1px dashed #27435d;
-  background: rgba(12, 24, 37, 0.46);
+  border: none;
+  background: transparent;
 }
 
 .legacy-table th,
