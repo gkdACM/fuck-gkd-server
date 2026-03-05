@@ -256,7 +256,7 @@ button:disabled {
 }
 
 .course-card.compact {
-  min-height: 85px;
+  min-height: 64px;
   padding: 8px;
   gap: 4px;
 }
@@ -357,7 +357,8 @@ button:disabled {
 }
 
 .empty-cell {
-  min-height: 66px;
+  min-height: 120px;
+  height: 100%;
   border-radius: 8px;
   border: 1px dashed #27435d;
   background: rgba(12, 24, 37, 0.46);
