@@ -212,9 +212,9 @@ button:disabled {
 
 .schedule-table .course-cell {
   width: 14.28%;
-  min-width: 142px;
-  min-height: 100px;
-  padding: 5px;
+  min-width: 160px;
+  min-height: 120px;
+  padding: 4px;
   background: linear-gradient(180deg, #102332 0%, #0f202f 100%);
 }
 
@@ -227,14 +227,14 @@ button:disabled {
 .course-card {
   border-radius: 8px;
   background: rgba(13, 39, 60, 0.85);
-  padding: 10px;
-  min-height: 100px;
+  padding: 8px;
+  min-height: 120px;
   width: 100%;
   border: 1px solid rgba(42, 81, 111, 0.4);
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
@@ -258,7 +258,7 @@ button:disabled {
 .course-card.compact {
   min-height: 85px;
   padding: 8px;
-  gap: 6px;
+  gap: 4px;
 }
 
 .course-card:hover {

@@ -490,12 +490,12 @@ function renderCourseCard(slot, registryKey) {
   const compactClass = state.compactMode ? "course-card compact" : "course-card";
   const bgColor = getCourseColor(slot.courseName);
   
-  // New layout: Name (primary), then grid of meta info with icons
+  // New layout: Name (primary) takes full width. Code moved to title.
+  // We hide the code in the card to save space, but keep it in the title attribute.
   return `
-    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};">
+    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};" title="${escapeHtml(slot.courseName)} ${codeText}">
       <div class="course-header">
-        <span class="course-name" title="${escapeHtml(slot.courseName)}">${escapeHtml(slot.courseName)}</span>
-        <span class="course-code-pill">${codeText}</span>
+        <span class="course-name">${escapeHtml(slot.courseName)}</span>
       </div>
       
       <div class="course-body">
