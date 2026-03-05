@@ -117,6 +117,67 @@ const state = {
   hasAppliedHashState: false,
 };
 
+// --- New Logic: Week Calculation ---
+function getWeekNumber(date, start) {
+  if (!date || !start) return 0;
+  
+  // Normalize to start of day (00:00:00) to avoid hour diffs
+  const current = new Date(date);
+  current.setHours(0, 0, 0, 0);
+  
+  const termStart = new Date(start);
+  termStart.setHours(0, 0, 0, 0);
+
+  // If start date is invalid
+  if (Number.isNaN(termStart.getTime())) return 0;
+
+  // Calculate day difference
+  const diffTime = current.getTime() - termStart.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Week 1 starts on day 0. Week = floor(diff / 7) + 1
+  // If diff is negative (before term starts), returns <= 0
+  return Math.floor(diffDays / 7) + 1;
+}
+
+function autoSelectCurrentWeek() {
+  // Priority: 
+  // 1. Hash param 'wn' (Already handled by applyHashStateToControls)
+  // 2. Local Storage Override (User manually set a preference? Maybe not needed if we rely on start date)
+  // 3. Auto-calc based on termStartDate
+  
+  // If a specific week is already selected via Hash, respect it.
+  const hashState = getHashState();
+  if (hashState.wn) {
+    return;
+  }
+  
+  // Try to use localStorage term start date if state is empty
+  if (!state.termStartDate) {
+     const storedStart = localStorage.getItem("term_start_date");
+     if (storedStart) {
+       state.termStartDate = storedStart;
+       termStartInput.value = storedStart;
+     }
+  }
+
+  if (!state.termStartDate) {
+    return;
+  }
+
+  const currentWeek = getWeekNumber(new Date(), state.termStartDate);
+  
+  // If calculated week is within valid range (e.g., 1-30)
+  if (currentWeek >= 1 && currentWeek <= 30) {
+    state.selectedWeekNumber = String(currentWeek);
+    if (weekNumberSelect) {
+        weekNumberSelect.value = state.selectedWeekNumber;
+    }
+    console.log(`Auto-selected week: ${currentWeek}`);
+  }
+}
+
+
 function formatDate(value) {
   if (!value) {
     return "未知时间";
@@ -1483,6 +1544,13 @@ async function loadTimetable() {
   showLoading();
   setStatus("正在加载课表...");
 
+  // Load user preference for term start date first
+  const storedStart = localStorage.getItem("term_start_date");
+  if (storedStart) {
+    state.termStartDate = storedStart;
+    termStartInput.value = storedStart;
+  }
+
   try {
     let version = "";
     try {
@@ -1490,6 +1558,7 @@ async function loadTimetable() {
       version = meta ? meta.version : "";
       if (meta?.term_start_date && !state.termStartDate) {
         state.termStartDate = String(meta.term_start_date);
+        termStartInput.value = state.termStartDate;
       }
     } catch (error) {
       console.warn("load meta.json failed", error);
@@ -1516,6 +1585,7 @@ async function loadTimetable() {
             }
             renderClassOptions(normalized);
             renderWeekNumberOptions(normalized);
+            autoSelectCurrentWeek();
             renderGridView();
             scheduleHashSync();
             setStatus(`已加载本地缓存 (v${version})`);
@@ -1536,6 +1606,7 @@ async function loadTimetable() {
       state.legacyData = null;
       if (!state.termStartDate && normalizedMulti.term_start_date) {
         state.termStartDate = normalizedMulti.term_start_date;
+        termStartInput.value = state.termStartDate;
       }
       
       // Save to cache
@@ -1550,6 +1621,7 @@ async function loadTimetable() {
 
       renderClassOptions(normalizedMulti);
       renderWeekNumberOptions(normalizedMulti);
+      autoSelectCurrentWeek();
       renderGridView();
       scheduleHashSync();
       hideLoading();
@@ -1564,6 +1636,7 @@ async function loadTimetable() {
       state.legacyData = null;
       if (!state.termStartDate && normalizedSingle.term_start_date) {
         state.termStartDate = normalizedSingle.term_start_date;
+        termStartInput.value = state.termStartDate;
       }
 
       // Save to cache
@@ -1578,6 +1651,7 @@ async function loadTimetable() {
 
       renderClassOptions(normalizedSingle);
       renderWeekNumberOptions(normalizedSingle);
+      autoSelectCurrentWeek();
       renderGridView();
       scheduleHashSync();
       hideLoading();
@@ -1739,6 +1813,22 @@ enableIcsToggle.addEventListener("change", () => {
 
 termStartInput.addEventListener("change", () => {
   state.termStartDate = termStartInput.value;
+  if (state.termStartDate) {
+    localStorage.setItem("term_start_date", state.termStartDate);
+  } else {
+    localStorage.removeItem("term_start_date");
+  }
+  
+  // If the user sets the start date, we should probably auto-select the current week
+  // unless they specifically chose another week in the filter? 
+  // Let's just update the week number if none is currently locked by hash.
+  if (!getHashState().wn) {
+    autoSelectCurrentWeek();
+    if (state.dataset) {
+      renderGridView();
+    }
+  }
+
   refreshIcsAvailability(state.dataset);
   scheduleHashSync();
 });
