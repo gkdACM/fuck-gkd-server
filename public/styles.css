@@ -215,7 +215,7 @@ button:disabled {
   min-width: 160px;
   min-height: 120px;
   padding: 4px;
-  background: linear-gradient(180deg, #102332 0%, #0f202f 100%);
+  /* background: linear-gradient(180deg, #102332 0%, #0f202f 100%); */
 }
 
 .course-stack {
@@ -226,15 +226,15 @@ button:disabled {
 
 .course-card {
   border-radius: 8px;
-  background: rgba(13, 39, 60, 0.85);
-  padding: 8px;
+  background: rgba(13, 39, 60, 0.65);
+  padding: 10px;
   min-height: 120px;
   width: 100%;
-  border: 1px solid rgba(42, 81, 111, 0.4);
+  border: 1px solid rgba(42, 81, 111, 0.3);
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
@@ -360,8 +360,8 @@ button:disabled {
   min-height: 120px;
   height: 100%;
   border-radius: 8px;
-  border: 1px dashed #27435d;
-  background: rgba(12, 24, 37, 0.46);
+  /* border: 1px dashed #27435d; */
+  /* background: rgba(12, 24, 37, 0.46); */
 }
 
 .legacy-table th,
