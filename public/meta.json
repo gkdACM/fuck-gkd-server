@@ -1,5 +1,5 @@
 {
-  "version": "2b58ab42125b6184",
+  "version": "11061c071934ed55",
   "summary": {
     "file_count": 2,
     "class_count": 642,
@@ -11,7 +11,7 @@
       "mode": "multi",
       "class_count": 641,
       "record_count": 15361,
-      "sha256": "c1916125df3375885bcacb76363d84ff28d272da6de8ea9ad21684a3d1101ef3",
+      "sha256": "435262d02516a4918d2984fe9003c9f9815151fac4056ab1d7b0ce18a3eee424",
       "generated_at": "2026-03-04T08:21:50.938Z",
       "source": "timetable/timetables-*.json"
     },
@@ -20,7 +20,7 @@
       "mode": "legacy",
       "class_count": 1,
       "record_count": 1,
-      "sha256": "2bd214ba2d07de6e69ff4d23c5b12bdee53b9f96472dae9e59f916854819ac0f",
+      "sha256": "e4f0eac6b2286bc93c532204afca7598a30edfa0cdd1e7d0b69736639434fcd3",
       "generated_at": "2026-03-03T00:00:00+00:00",
       "source": "manual"
     }
