@@ -62,39 +62,142 @@ const PERIOD_TIME_RANGE = {
   "9-11": { start: "19:00", end: "21:35" },
 };
 
-function normalizePeriodToFixedBlock(value) {
+const ATOMIC_PERIOD_TIME_RANGE = {
+  1: { start: "08:00", end: "08:45" },
+  2: { start: "08:50", end: "09:35" },
+  3: { start: "10:00", end: "10:45" },
+  4: { start: "10:50", end: "11:35" },
+  5: { start: "14:00", end: "14:45" },
+  6: { start: "14:50", end: "15:35" },
+  7: { start: "16:00", end: "16:45" },
+  8: { start: "16:50", end: "17:35" },
+  9: { start: "19:00", end: "19:45" },
+  10: { start: "19:50", end: "20:35" },
+  11: { start: "20:50", end: "21:35" },
+};
+
+function parsePeriodRange(value, startHint = "", lengthHint = "") {
   const raw = String(value ?? "").trim();
-  if (!raw) {
-    return "";
-  }
+  const numbers = (raw.match(/\d+/g) || []).map((item) => Number.parseInt(item, 10));
 
-  if (DEFAULT_PERIODS.some((period) => period.id === raw)) {
-    return raw;
-  }
-
-  const numbers = raw.match(/\d+/g) || [];
-  if (!numbers.length) {
-    return "";
-  }
-
-  const start = Number.parseInt(numbers[0], 10);
+  let start = numbers.length ? numbers[0] : Number.parseInt(String(startHint ?? "").trim(), 10);
   if (!Number.isFinite(start)) {
+    return null;
+  }
+
+  let end = numbers.length >= 2 ? numbers[numbers.length - 1] : start;
+  if (!Number.isFinite(end)) {
+    end = start;
+  }
+
+  const length = Number.parseInt(String(lengthHint ?? "").trim(), 10);
+  if (Number.isFinite(length) && length > 0) {
+    end = Math.max(end, start + length - 1);
+  }
+
+  if (end < start) {
+    return { start: end, end: start };
+  }
+
+  return { start, end };
+}
+
+const FIXED_PERIOD_BOUNDS = DEFAULT_PERIODS.map((period) => {
+  const bounds = parsePeriodRange(period.id);
+  return {
+    id: period.id,
+    start: bounds?.start ?? 0,
+    end: bounds?.end ?? 0,
+  };
+});
+
+function normalizePeriodText(value, startHint = "", lengthHint = "") {
+  const bounds = parsePeriodRange(value, startHint, lengthHint);
+  if (!bounds) {
+    return "";
+  }
+  return `${bounds.start}-${bounds.end}`;
+}
+
+function getFixedPeriodBlocks(value, startHint = "", lengthHint = "") {
+  const bounds = parsePeriodRange(value, startHint, lengthHint);
+  if (!bounds) {
+    return [];
+  }
+
+  return FIXED_PERIOD_BOUNDS
+    .filter((period) => period.start <= bounds.end && period.end >= bounds.start)
+    .map((period) => period.id);
+}
+
+function normalizePeriodBlocks(value, periodText, startHint = "", lengthHint = "") {
+  if (Array.isArray(value)) {
+    const normalized = Array.from(
+      new Set(
+        value
+          .map((item) => String(item ?? "").trim())
+          .filter((item) => FIXED_PERIOD_BOUNDS.some((period) => period.id === item)),
+      ),
+    );
+    if (normalized.length) {
+      return normalized;
+    }
+  }
+
+  return getFixedPeriodBlocks(periodText, startHint, lengthHint);
+}
+
+function getSlotPeriodBlocks(slot) {
+  if (Array.isArray(slot?.periodBlocks) && slot.periodBlocks.length) {
+    return slot.periodBlocks;
+  }
+
+  return getFixedPeriodBlocks(
+    slot?.period,
+    slot?.startPeriod,
+    slot?.continuousPeriods,
+  );
+}
+
+function getTimeRangeForPeriod(periodText) {
+  const bounds = parsePeriodRange(periodText);
+  if (!bounds) {
+    return PERIOD_TIME_RANGE[periodText] || null;
+  }
+
+  const startRange = ATOMIC_PERIOD_TIME_RANGE[bounds.start];
+  const endRange = ATOMIC_PERIOD_TIME_RANGE[bounds.end];
+  if (startRange && endRange) {
+    return {
+      start: startRange.start,
+      end: endRange.end,
+    };
+  }
+
+  const blocks = getFixedPeriodBlocks(periodText, bounds.start, bounds.end - bounds.start + 1);
+  if (!blocks.length) {
+    return null;
+  }
+
+  return {
+    start: PERIOD_TIME_RANGE[blocks[0]]?.start || "",
+    end: PERIOD_TIME_RANGE[blocks[blocks.length - 1]]?.end || "",
+  };
+}
+
+function getSessionLabelForPeriod(periodText) {
+  const bounds = parsePeriodRange(periodText);
+  if (!bounds) {
     return "";
   }
 
-  if (start <= 2) {
-    return "1-2";
+  if (bounds.start <= 4) {
+    return "上午";
   }
-  if (start <= 4) {
-    return "3-4";
+  if (bounds.start <= 8) {
+    return "下午";
   }
-  if (start <= 6) {
-    return "5-6";
-  }
-  if (start <= 8) {
-    return "7-8";
-  }
-  return "9-11";
+  return "晚上";
 }
 
 const state = {
@@ -173,7 +276,6 @@ function autoSelectCurrentWeek() {
     if (weekNumberSelect) {
         weekNumberSelect.value = state.selectedWeekNumber;
     }
-    console.log(`Auto-selected week: ${currentWeek}`);
   }
 }
 
@@ -364,16 +466,32 @@ function normalizeSlots(slots) {
       }
 
       const day = toDayLabel(slot.day ?? slot.weekday ?? slot.dayLabel ?? "");
-      const period = normalizePeriodToFixedBlock(slot.period ?? slot.section ?? slot.time ?? "");
+      const period = normalizePeriodText(
+        slot.period ?? slot.section ?? slot.time ?? "",
+        slot.startPeriod ?? slot.Skjc ?? slot.start ?? "",
+        slot.continuousPeriods ?? slot.Cxjc ?? slot.span ?? "",
+      );
+      const periodBlocks = normalizePeriodBlocks(
+        slot.periodBlocks ?? slot.blocks ?? slot.fixedBlocks,
+        period,
+        slot.startPeriod ?? slot.Skjc ?? slot.start ?? "",
+        slot.continuousPeriods ?? slot.Cxjc ?? slot.span ?? "",
+      );
       const courseName = String(slot.courseName ?? slot.course ?? "").trim();
 
-      if (!day || !period || !courseName) {
+      if (!day || !period || !periodBlocks.length || !courseName) {
         return null;
       }
+
+      const periodRange = parsePeriodRange(period);
 
       return {
         day,
         period,
+        periodBlocks,
+        startPeriod: periodRange?.start ?? "",
+        endPeriod: periodRange?.end ?? "",
+        continuousPeriods: periodRange ? periodRange.end - periodRange.start + 1 : "",
         courseCode: String(slot.courseCode ?? slot.code ?? slot.kch ?? "").trim(),
         courseSeq: String(slot.courseSeq ?? slot.kcxh ?? slot.seq ?? "").trim(),
         courseName,
@@ -484,22 +602,9 @@ function renderTodaySchedule(classItem, dataset, weekFilter) {
 
   const todayIndex = getTodayIndex();
   const todayLabel = DAYS[todayIndex];
-  
-  // Reuse buildSlotMap but filter for today
-  const slotMap = buildSlotMap(classItem.slots, "", weekFilter);
-  const periods = dataset.periods;
-  
-  const todaySlots = [];
-  for (const period of periods) {
-    const key = `${period.id}|${todayLabel}`;
-    const slots = slotMap.get(key) || [];
-    if (slots.length > 0) {
-      const merged = mergeSlotsForDisplay(slots);
-      todaySlots.push({ period, items: merged });
-    }
-  }
 
-  if (todaySlots.length === 0) {
+  const todayItems = getVisibleMergedRows(classItem, "", weekFilter, todayLabel);
+  if (!todayItems.length) {
     todaySchedule.innerHTML = `
       <div class="today-empty">
         <div class="today-header">📅 今日日程 (${todayLabel})</div>
@@ -510,26 +615,24 @@ function renderTodaySchedule(classItem, dataset, weekFilter) {
     return;
   }
 
-  const cardsHtml = todaySlots.map(group => {
-    return group.items.map(item => {
-      const color = getCourseColor(item.courseName);
-      return `
-        <div class="today-card" style="border-left-color: ${color}">
-          <div class="today-time">
-            <span class="period-badge">${group.period.label}</span>
-            <span class="session-label">${group.period.session}</span>
-          </div>
-          <div class="today-info">
-            <div class="today-course">${escapeHtml(item.courseName)}</div>
-            <div class="today-meta">
-              <span class="meta-item">📍 ${escapeHtml(item.location || "未知")}</span>
-              <span class="meta-item">👤 ${escapeHtml(item.teacher || "待定")}</span>
-              ${item.weeks ? `<span class="meta-item">📅 ${escapeHtml(item.weeks)}</span>` : ""}
-            </div>
+  const cardsHtml = todayItems.map((item) => {
+    const color = getCourseColor(item.courseName);
+    return `
+      <div class="today-card" style="border-left-color: ${color}">
+        <div class="today-time">
+          <span class="period-badge">${escapeHtml(item.period || "-")}</span>
+          <span class="session-label">${escapeHtml(getSessionLabelForPeriod(item.period))}</span>
+        </div>
+        <div class="today-info">
+          <div class="today-course">${escapeHtml(item.courseName)}</div>
+          <div class="today-meta">
+            <span class="meta-item">📍 ${escapeHtml(item.location || "未知")}</span>
+            <span class="meta-item">👤 ${escapeHtml(item.teacher || "待定")}</span>
+            ${item.weeks ? `<span class="meta-item">📅 ${escapeHtml(item.weeks)}</span>` : ""}
           </div>
         </div>
-      `;
-    }).join("");
+      </div>
+    `;
   }).join("");
 
   todaySchedule.innerHTML = `
@@ -547,6 +650,7 @@ function renderCourseCard(slot, registryKey) {
   const codeText = slot.courseCode
     ? `[${escapeHtml(slot.courseCode)}]`
     : "";
+  const periodText = slot.period ? ` · ${escapeHtml(slot.period)}` : "";
   
   const compactClass = state.compactMode ? "course-card compact" : "course-card";
   const bgColor = getCourseColor(slot.courseName);
@@ -554,7 +658,7 @@ function renderCourseCard(slot, registryKey) {
   // New layout: Name (primary) takes full width. Code moved to title.
   // We hide the code in the card to save space, but keep it in the title attribute.
   return `
-    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};" title="${escapeHtml(slot.courseName)} ${codeText}">
+    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};" title="${escapeHtml(slot.courseName)} ${codeText}${periodText}">
       <div class="course-header">
         <span class="course-name">${escapeHtml(slot.courseName)}</span>
       </div>
@@ -851,36 +955,53 @@ function mergeSlotsForDisplay(slots) {
   });
 }
 
-function buildSlotMap(slots, keyword, weekFilter) {
+function slotMatchesKeyword(slot, loweredKeyword) {
+  if (!loweredKeyword) {
+    return true;
+  }
+
+  const searchable = [
+    slot.courseCode,
+    slot.courseSeq,
+    slot.courseName,
+    slot.period,
+    slot.location,
+    slot.teacher,
+    slot.weeks,
+    slot.note,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(loweredKeyword);
+}
+
+function getFilteredSlots(slots, keyword, weekFilter, dayLabel = "") {
   const lowered = keyword.trim().toLowerCase();
+  return slots.filter((slot) => {
+    if (dayLabel && slot.day !== dayLabel) {
+      return false;
+    }
+
+    if (!slotMatchesKeyword(slot, lowered)) {
+      return false;
+    }
+
+    return matchesWeekFilter(slot, weekFilter);
+  });
+}
+
+function buildSlotMap(slots, keyword, weekFilter) {
   const map = new Map();
 
-  for (const slot of slots) {
-    const searchable = [
-      slot.courseCode,
-      slot.courseSeq,
-      slot.courseName,
-      slot.location,
-      slot.teacher,
-      slot.weeks,
-      slot.note,
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    if (lowered && !searchable.includes(lowered)) {
-      continue;
+  for (const slot of getFilteredSlots(slots, keyword, weekFilter)) {
+    for (const blockId of getSlotPeriodBlocks(slot)) {
+      const key = `${blockId}|${slot.day}`;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key).push(slot);
     }
-
-    if (!matchesWeekFilter(slot, weekFilter)) {
-      continue;
-    }
-
-    const key = `${slot.period}|${slot.day}`;
-    if (!map.has(key)) {
-      map.set(key, []);
-    }
-    map.get(key).push(slot);
   }
 
   return map;
@@ -1028,29 +1149,45 @@ function currentClass() {
   );
 }
 
-function getVisibleMergedRows(classItem, keyword, weekFilter) {
+function getVisibleMergedRows(classItem, keyword, weekFilter, dayLabel = "") {
   if (!classItem) {
     return [];
   }
 
-  const slotMap = buildSlotMap(classItem.slots, keyword, weekFilter);
-  const rows = [];
-
-  for (const period of DEFAULT_PERIODS) {
-    for (const day of DAYS) {
-      const key = `${period.id}|${day}`;
-      const slots = slotMap.get(key) || [];
-      if (!slots.length) {
-        continue;
-      }
-      const merged = mergeSlotsForDisplay(slots);
-      for (const item of merged) {
-        rows.push(item);
-      }
+  const groups = new Map();
+  for (const slot of getFilteredSlots(classItem.slots, keyword, weekFilter, dayLabel)) {
+    const key = `${slot.day}|${slot.period}`;
+    if (!groups.has(key)) {
+      groups.set(key, []);
     }
+    groups.get(key).push(slot);
   }
 
-  return rows;
+  return Array.from(groups.values())
+    .flatMap((items) => mergeSlotsForDisplay(items))
+    .sort((left, right) => {
+      const leftDay = DAY_INDEX[left.day] ?? 99;
+      const rightDay = DAY_INDEX[right.day] ?? 99;
+      if (leftDay !== rightDay) {
+        return leftDay - rightDay;
+      }
+
+      const leftRange = parsePeriodRange(left.period);
+      const rightRange = parsePeriodRange(right.period);
+      const leftStart = leftRange?.start ?? 99;
+      const rightStart = rightRange?.start ?? 99;
+      if (leftStart !== rightStart) {
+        return leftStart - rightStart;
+      }
+
+      const leftEnd = leftRange?.end ?? 99;
+      const rightEnd = rightRange?.end ?? 99;
+      if (leftEnd !== rightEnd) {
+        return leftEnd - rightEnd;
+      }
+
+      return String(left.courseName || "").localeCompare(String(right.courseName || ""), "zh-CN");
+    });
 }
 
 function renderGridTable(classItem, periods, keyword, weekFilter) {
@@ -1422,7 +1559,7 @@ function exportCurrentIcs() {
   let eventCount = 0;
   rows.forEach((row, rowIndex) => {
     const dayOffset = DAY_INDEX[row.day];
-    const timeRange = PERIOD_TIME_RANGE[row.period];
+    const timeRange = getTimeRangeForPeriod(row.period);
     const weeksSet = row.weeksSet || parseWeeksFromText(row.weeks);
     if (dayOffset === undefined || !timeRange || !weeksSet || !weeksSet.size) {
       return;
@@ -1470,6 +1607,7 @@ function renderDetailItems(items) {
     .map((item) => `
       <article class="detail-card">
         <div><strong>课程：</strong>${escapeHtml(item.courseName || "-")}</div>
+        <div><strong>节次：</strong>${escapeHtml(item.period || "-")}</div>
         <div><strong>编码：</strong>${escapeHtml(item.courseCode || "-")}</div>
         <div><strong>课序号：</strong>${escapeHtml(item.courseSeq || "-")}</div>
         <div><strong>教师：</strong>${escapeHtml(item.teacher || "-")}</div>
@@ -1485,7 +1623,10 @@ function openDetailModal(payload) {
   if (!payload || !Array.isArray(payload.items)) {
     return;
   }
-  detailModalTitle.textContent = `${payload.day} ${payload.period} 节次详情`;
+  const actualPeriods = Array.from(new Set(payload.items.map((item) => item.period).filter(Boolean))).join(" / ");
+  detailModalTitle.textContent = actualPeriods && actualPeriods !== payload.period
+    ? `${payload.day} ${payload.period}（实际 ${actualPeriods}）详情`
+    : `${payload.day} ${payload.period} 节次详情`;
   detailModalBody.innerHTML = renderDetailItems(payload.items);
   detailModal.classList.remove("hidden");
   detailModal.setAttribute("aria-hidden", "false");
