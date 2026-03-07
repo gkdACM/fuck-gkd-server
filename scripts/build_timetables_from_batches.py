@@ -27,6 +27,14 @@ FIXED_PERIODS: list[dict[str, str]] = [
     {"id": "9-11", "label": "9-11", "session": "晚上"},
 ]
 
+FIXED_PERIOD_BOUNDS: list[dict[str, int | str]] = [
+    {"id": "1-2", "start": 1, "end": 2},
+    {"id": "3-4", "start": 3, "end": 4},
+    {"id": "5-6", "start": 5, "end": 6},
+    {"id": "7-8", "start": 7, "end": 8},
+    {"id": "9-11", "start": 9, "end": 11},
+]
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="将 timetable 分片聚合为前端课表数据")
@@ -76,27 +84,64 @@ def _to_day_label(value: Any) -> str:
     return mapping.get(raw, raw)
 
 
-def _normalize_period(value: Any, start_hint: Any = None) -> str:
+def _parse_period_bounds(
+    value: Any,
+    start_hint: Any = None,
+    length_hint: Any = None,
+) -> tuple[int, int] | None:
     raw = str(value or "").strip()
     numbers = [int(item) for item in re.findall(r"\d+", raw)]
 
     start = numbers[0] if numbers else None
+    end = (
+        numbers[-1]
+        if len(numbers) >= 2
+        else (numbers[0] if len(numbers) == 1 else None)
+    )
     if start is None:
         hint = str(start_hint or "").strip()
         start = int(hint) if hint.isdigit() else None
 
     if start is None:
+        return None
+
+    if end is None:
+        length_text = str(length_hint or "").strip()
+        if length_text.isdigit():
+            end = start + int(length_text) - 1
+        else:
+            end = start
+
+    if end < start:
+        start, end = end, start
+
+    return start, end
+
+
+def _normalize_period(
+    value: Any, start_hint: Any = None, length_hint: Any = None
+) -> str:
+    bounds = _parse_period_bounds(value, start_hint, length_hint)
+    if not bounds:
         return ""
 
-    if start <= 2:
-        return "1-2"
-    if start <= 4:
-        return "3-4"
-    if start <= 6:
-        return "5-6"
-    if start <= 8:
-        return "7-8"
-    return "9-11"
+    start, end = bounds
+    return f"{start}-{end}"
+
+
+def _period_blocks(
+    value: Any, start_hint: Any = None, length_hint: Any = None
+) -> list[str]:
+    bounds = _parse_period_bounds(value, start_hint, length_hint)
+    if not bounds:
+        return []
+
+    start, end = bounds
+    return [
+        str(block["id"])
+        for block in FIXED_PERIOD_BOUNDS
+        if int(block["start"]) <= end and int(block["end"]) >= start
+    ]
 
 
 def _period_sort_key(period: str) -> tuple[int, int, str]:
@@ -169,19 +214,21 @@ def _guess_direction_name_from_class_name(class_name: Any) -> str:
     return _normalize_direction_name(prefix)
 
 
-def _slot_from_row(row: dict[str, Any]) -> dict[str, str] | None:
+def _slot_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     course_name = str(row.get("Kcm") or "").strip()
     if not course_name:
         return None
 
     day = _to_day_label(row.get("Skxq"))
-    period = _normalize_period(row.get("Jc"), row.get("Skjc"))
-    if not day or not period:
+    period = _normalize_period(row.get("Jc"), row.get("Skjc"), row.get("Cxjc"))
+    period_blocks = _period_blocks(row.get("Jc"), row.get("Skjc"), row.get("Cxjc"))
+    if not day or not period or not period_blocks:
         return None
 
     return {
         "day": day,
         "period": period,
+        "periodBlocks": period_blocks,
         "courseCode": str(row.get("Kch") or "").strip(),
         "courseName": course_name,
         "teacher": str(row.get("Jsms") or "").strip(),
@@ -230,7 +277,9 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
             if not isinstance(meta, dict):
                 meta = {}
 
-            class_id = str(meta.get("id") or meta.get("bjh") or batch_item.get("bjh") or "").strip()
+            class_id = str(
+                meta.get("id") or meta.get("bjh") or batch_item.get("bjh") or ""
+            ).strip()
             class_name = str(meta.get("bm") or class_id).strip()
             if not class_id or not class_name:
                 continue
@@ -261,12 +310,16 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
             if not class_item.get("directionName") and direction_name:
                 class_item["directionName"] = direction_name
 
-            known_name = direction_name_by_code.get(direction_code, "") if direction_code else ""
+            known_name = (
+                direction_name_by_code.get(direction_code, "") if direction_code else ""
+            )
             if direction_code and known_name and not class_item.get("directionName"):
                 class_item["directionName"] = known_name
 
             row_container = batch_item.get("data")
-            rows = row_container.get("rows") if isinstance(row_container, dict) else None
+            rows = (
+                row_container.get("rows") if isinstance(row_container, dict) else None
+            )
             if not isinstance(rows, list):
                 continue
 
@@ -279,25 +332,41 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
                     continue
 
                 if not class_item.get("collegeName"):
-                    class_item["collegeName"] = str(row.get("Xsm") or row.get("Xsjc") or "").strip()
+                    class_item["collegeName"] = str(
+                        row.get("Xsm") or row.get("Xsjc") or ""
+                    ).strip()
                 if not class_item.get("majorName"):
                     class_item["majorName"] = str(row.get("Zym") or "").strip()
 
                 if not class_item.get("grade"):
-                    class_item["grade"] = str(row.get("Njdm") or row.get("njdm") or "").strip()
+                    class_item["grade"] = str(
+                        row.get("Njdm") or row.get("njdm") or ""
+                    ).strip()
                 if not class_item.get("collegeCode"):
-                    class_item["collegeCode"] = str(row.get("Xsh") or row.get("xsh") or "").strip()
+                    class_item["collegeCode"] = str(
+                        row.get("Xsh") or row.get("xsh") or ""
+                    ).strip()
                 if not class_item.get("majorCode"):
-                    class_item["majorCode"] = str(row.get("Zyh") or row.get("zyh") or "").strip()
+                    class_item["majorCode"] = str(
+                        row.get("Zyh") or row.get("zyh") or ""
+                    ).strip()
                 if not class_item.get("directionCode"):
-                    class_item["directionCode"] = str(row.get("zyfxh") or row.get("Zyfxh") or "").strip()
+                    class_item["directionCode"] = str(
+                        row.get("zyfxh") or row.get("Zyfxh") or ""
+                    ).strip()
                 if not class_item.get("directionName"):
                     class_item["directionName"] = _extract_direction_name(row)
 
-                current_direction_code = str(class_item.get("directionCode") or "").strip()
-                current_direction_name = _normalize_direction_name(class_item.get("directionName"))
+                current_direction_code = str(
+                    class_item.get("directionCode") or ""
+                ).strip()
+                current_direction_name = _normalize_direction_name(
+                    class_item.get("directionName")
+                )
                 if current_direction_code and current_direction_name:
-                    direction_name_by_code.setdefault(current_direction_code, current_direction_name)
+                    direction_name_by_code.setdefault(
+                        current_direction_code, current_direction_name
+                    )
                 elif current_direction_code and not current_direction_name:
                     known_name = direction_name_by_code.get(current_direction_code, "")
                     if known_name:
@@ -346,7 +415,11 @@ def build_dataset(input_dir: Path) -> dict[str, Any]:
 
     period_items = FIXED_PERIODS
 
-    generated_at = max(generated_at_candidates) if generated_at_candidates else datetime.now(timezone.utc).isoformat()
+    generated_at = (
+        max(generated_at_candidates)
+        if generated_at_candidates
+        else datetime.now(timezone.utc).isoformat()
+    )
 
     return {
         "generated_at": generated_at,
@@ -361,12 +434,18 @@ def main() -> None:
     dataset = build_dataset(args.input_dir)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(dataset, ensure_ascii=False, indent=2), encoding="utf-8")
+    args.output.write_text(
+        json.dumps(dataset, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     class_count = len(dataset["classes"])
-    slot_count = sum(len(class_item.get("slots", [])) for class_item in dataset["classes"])
+    slot_count = sum(
+        len(class_item.get("slots", [])) for class_item in dataset["classes"]
+    )
     print(f"[build] 已生成 {args.output}")
-    print(f"[build] 班级数={class_count} 课程条目={slot_count} 节次数={len(dataset['periods'])}")
+    print(
+        f"[build] 班级数={class_count} 课程条目={slot_count} 节次数={len(dataset['periods'])}"
+    )
 
 
 if __name__ == "__main__":
