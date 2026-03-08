@@ -463,13 +463,64 @@ button:disabled {
 }
 
 .course-card.compact .meta-row--period {
-  color: #dbeafe;
-  font-weight: 600;
+  color: var(--compact-period-color, #dbeafe);
+  font-weight: 700;
 }
 
 .course-card.compact .meta-row span {
   display: block;
   min-width: 0;
+}
+
+.schedule-table th.is-today-column {
+  background: linear-gradient(180deg, #13345b 0%, #0d2038 100%);
+  color: #dbeafe;
+}
+
+.schedule-table td.course-cell.is-today-column {
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.18);
+}
+
+.schedule-table td.course-cell.is-today-column .empty-cell {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.schedule-table td.course-cell.is-today-column .course-card {
+  border-color: rgba(96, 165, 250, 0.28);
+}
+
+#jumpCurrentWeekBtn {
+  background: linear-gradient(180deg, #0f9d8a 0%, #0a7f70 100%);
+}
+
+#jumpCurrentWeekBtn:hover {
+  background: linear-gradient(180deg, #13b19c 0%, #0b8d7c 100%);
+}
+
+#copyShareLinkBtn {
+  background: linear-gradient(180deg, #6d4aff 0%, #5436db 100%);
+}
+
+#copyShareLinkBtn:hover {
+  background: linear-gradient(180deg, #7b5cff 0%, #6041eb 100%);
+}
+
+#favoriteClassBtn.is-active {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: #fff7ed;
+}
+
+#favoriteClassBtn.is-active:hover {
+  background: linear-gradient(180deg, #fbbf24 0%, #ea860d 100%);
+}
+
+#exportPngBtn {
+  background: linear-gradient(180deg, #db2777 0%, #be185d 100%);
+}
+
+#exportPngBtn:hover {
+  background: linear-gradient(180deg, #ec4899 0%, #cf1d68 100%);
 }
 
 /* Today Schedule Styles */
@@ -955,11 +1006,349 @@ button:disabled {
 }
 
 .course-card.compact .meta-row--period {
-  color: #dbeafe;
-  font-weight: 600;
+  color: var(--compact-period-color, #dbeafe);
+  font-weight: 700;
+}
+
+.course-card.compact .meta-row--period span,
+.course-card.compact .meta-row--period svg {
+  color: inherit;
+  opacity: 1;
 }
 
 .course-card.compact .meta-row span {
   display: block;
   min-width: 0;
+}
+
+:root {
+  color-scheme: dark;
+  --bg-body: radial-gradient(circle at top, #13233a 0%, #090f19 58%);
+  --text-primary: #d7e5f3;
+  --text-heading: #eef2f7;
+  --text-secondary: #98afc7;
+  --text-muted: #86a0bb;
+  --panel-bg: rgba(10, 20, 34, 0.78);
+  --panel-border: #22364e;
+  --control-bg: #0f1724;
+  --control-border: #2b3b4f;
+  --input-bg: #0f1724;
+  --input-border: #2b3b4f;
+  --input-text: #d5e3f0;
+  --table-wrap-bg: #0b1220;
+  --table-wrap-border: #203248;
+  --thead-bg: #070e17;
+  --thead-border: #2a3b51;
+  --cell-border: #25374d;
+  --tbody-bg: #10222f;
+  --session-bg: #081019;
+  --period-bg: #0c1624;
+  --card-bg: rgba(13, 39, 60, 0.65);
+  --card-bg-hover: rgba(18, 48, 73, 0.98);
+  --card-border: rgba(42, 81, 111, 0.3);
+  --meta-text: #94a3b8;
+  --today-panel-bg: linear-gradient(135deg, rgba(20, 35, 55, 0.9) 0%, rgba(13, 24, 38, 0.95) 100%);
+  --today-panel-border: #3b82f6;
+  --today-card-bg: rgba(30, 41, 59, 0.6);
+  --today-card-bg-hover: rgba(30, 41, 59, 0.8);
+  --today-card-border: #334155;
+  --today-header-color: #60a5fa;
+  --today-empty-bg: rgba(16, 30, 48, 0.6);
+  --today-empty-border: #334155;
+  --today-empty-text: #94a3b8;
+  --today-empty-heading-color: #94a3b8;
+  --today-time-border: rgba(255, 255, 255, 0.1);
+  --period-badge-color: #ffffff;
+  --compact-period-color: #dbeafe;
+  --modal-backdrop: rgba(3, 8, 15, 0.72);
+  --modal-bg: #0b1625;
+  --modal-header-bg: #0d1a2b;
+  --modal-border: #284160;
+  --detail-card-bg: rgba(13, 39, 60, 0.72);
+  --detail-card-border: #2a516f;
+  --toast-bg: rgba(15, 23, 42, 0.95);
+  --toast-border: #334155;
+  --today-column-header-bg: linear-gradient(180deg, #13345b 0%, #0d2038 100%);
+  --today-column-header-color: #dbeafe;
+  --today-column-cell-bg: rgba(59, 130, 246, 0.08);
+  --today-column-outline: rgba(96, 165, 250, 0.18);
+  --today-column-empty-bg: rgba(37, 99, 235, 0.08);
+  --today-column-card-border: rgba(96, 165, 250, 0.28);
+  --png-export-bg: #09111b;
+  --png-export-panel-bg: #0b1220;
+  --png-export-panel-border: #203248;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-body: linear-gradient(180deg, #d9d4cd 0%, #d1cbc4 100%);
+  --text-primary: #1f252c;
+  --text-heading: #181d24;
+  --text-secondary: #5c6370;
+  --text-muted: #6a717d;
+  --panel-bg: rgba(244, 239, 233, 0.96);
+  --panel-border: #cec6bc;
+  --control-bg: #ece6df;
+  --control-border: #c2bbb2;
+  --input-bg: #f5f1eb;
+  --input-border: #b8b0a7;
+  --input-text: #1c232b;
+  --table-wrap-bg: #f0ebe4;
+  --table-wrap-border: #cbc4ba;
+  --thead-bg: #e2dad0;
+  --thead-border: #cbc4ba;
+  --cell-border: #cdc6bc;
+  --tbody-bg: #ebe5de;
+  --session-bg: #e1dcd4;
+  --period-bg: #e6e0d8;
+  --card-bg: rgba(246, 242, 236, 0.98);
+  --card-bg-hover: rgba(238, 233, 227, 1);
+  --card-border: rgba(124, 125, 131, 0.24);
+  --meta-text: #5c6470;
+  --today-panel-bg: linear-gradient(180deg, rgba(225, 219, 213, 0.98) 0%, rgba(215, 209, 202, 0.98) 100%);
+  --today-panel-border: #9aa2ad;
+  --today-card-bg: #efe9e2;
+  --today-card-bg-hover: #e6dfd7;
+  --today-card-border: #c8bfb5;
+  --today-header-color: #4b5869;
+  --today-empty-bg: rgba(229, 223, 216, 0.98);
+  --today-empty-border: #b7aea5;
+  --today-empty-text: #646b76;
+  --today-empty-heading-color: #4f5b6c;
+  --today-time-border: rgba(15, 23, 42, 0.08);
+  --period-badge-color: #1c232b;
+  --compact-period-color: #4f5d70;
+  --modal-backdrop: rgba(15, 23, 42, 0.28);
+  --modal-bg: #f3eee8;
+  --modal-header-bg: #e6dfd7;
+  --modal-border: #cbc3b8;
+  --detail-card-bg: #ebe4dc;
+  --detail-card-border: #cfc6bb;
+  --toast-bg: rgba(244, 239, 233, 0.98);
+  --toast-border: #cbc3b8;
+  --today-column-header-bg: linear-gradient(180deg, #d9d3cb 0%, #e1dbd4 100%);
+  --today-column-header-color: #566273;
+  --today-column-cell-bg: rgba(100, 112, 129, 0.035);
+  --today-column-outline: rgba(100, 112, 129, 0.08);
+  --today-column-empty-bg: rgba(100, 112, 129, 0.025);
+  --today-column-card-border: rgba(100, 112, 129, 0.12);
+  --png-export-bg: #d9d4cd;
+  --png-export-panel-bg: #f3eee8;
+  --png-export-panel-border: #cbc3b8;
+}
+
+body {
+  background: var(--bg-body);
+  color: var(--text-primary);
+}
+
+h1 {
+  color: var(--text-heading);
+}
+
+.status {
+  color: var(--text-secondary);
+}
+
+.toolbar {
+  border-color: var(--panel-border);
+  background: var(--panel-bg);
+}
+
+.control-inline {
+  border-color: var(--control-border);
+  background: var(--control-bg);
+}
+
+.control-inline > span,
+.control > span {
+  color: var(--text-muted);
+}
+
+select,
+input[type="search"],
+input[type="date"] {
+  border-color: var(--input-border);
+  color: var(--input-text);
+  background: var(--input-bg);
+}
+
+.table-wrap {
+  background: var(--table-wrap-bg);
+  border-color: var(--table-wrap-border);
+}
+
+.schedule-table thead th,
+.legacy-table thead th {
+  background: var(--thead-bg);
+  color: var(--text-heading);
+  border-color: var(--thead-border);
+}
+
+.schedule-table td,
+.schedule-table th,
+.legacy-table td,
+.legacy-table th {
+  border-color: var(--cell-border);
+}
+
+.schedule-table tbody td,
+.legacy-table tbody td {
+  background: var(--tbody-bg);
+  color: var(--text-primary);
+}
+
+.schedule-table .session-cell {
+  background: var(--session-bg);
+  color: var(--text-heading);
+}
+
+.schedule-table .period-cell {
+  background: var(--period-bg);
+  color: var(--text-primary);
+}
+
+.course-card {
+  background: var(--card-bg);
+  border-color: var(--card-border);
+}
+
+.course-card:hover {
+  background: var(--card-bg-hover);
+}
+
+.course-name,
+.today-course {
+  color: var(--text-heading);
+}
+
+.meta-row,
+.today-meta,
+.empty,
+.today-empty,
+.session-label,
+.control-inline > span {
+  color: var(--meta-text);
+}
+
+.today-container {
+  background: var(--today-panel-bg);
+  border-color: var(--today-panel-border);
+}
+
+.today-header {
+  color: var(--today-header-color);
+}
+
+.today-card {
+  background: var(--today-card-bg);
+  border-color: var(--today-card-border);
+}
+
+.today-card:hover {
+  background: var(--today-card-bg-hover);
+}
+
+.today-empty {
+  background: var(--today-empty-bg);
+  border-color: var(--today-empty-border);
+  color: var(--today-empty-text);
+}
+
+.today-empty .today-header {
+  color: var(--today-empty-heading-color);
+}
+
+.today-time {
+  border-right-color: var(--today-time-border);
+}
+
+.period-badge {
+  color: var(--period-badge-color);
+}
+
+.detail-modal-backdrop {
+  background: var(--modal-backdrop);
+}
+
+.detail-modal-panel {
+  background: var(--modal-bg);
+  border-color: var(--modal-border);
+}
+
+.detail-modal-header {
+  background: var(--modal-header-bg);
+  border-bottom-color: var(--modal-border);
+}
+
+.detail-card {
+  background: var(--detail-card-bg);
+  border-color: var(--detail-card-border);
+}
+
+.toast {
+  background: var(--toast-bg);
+  border-color: var(--toast-border);
+  color: var(--text-primary);
+}
+
+.schedule-table th.is-today-column {
+  background: var(--today-column-header-bg);
+  color: var(--today-column-header-color);
+}
+
+.schedule-table td.course-cell.is-today-column {
+  background: var(--today-column-cell-bg);
+  box-shadow: inset 0 0 0 1px var(--today-column-outline);
+}
+
+.schedule-table td.course-cell.is-today-column .empty-cell {
+  background: var(--today-column-empty-bg);
+}
+
+.schedule-table td.course-cell.is-today-column .course-card {
+  border-color: var(--today-column-card-border);
+}
+
+.png-export-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  padding: 24px;
+  background: var(--png-export-bg);
+  pointer-events: none;
+}
+
+.png-export-panel {
+  padding: 18px;
+  background: var(--png-export-panel-bg);
+  border: 1px solid var(--png-export-panel-border);
+  border-radius: 16px;
+}
+
+.png-export-header {
+  margin-bottom: 16px;
+}
+
+.png-export-header h2 {
+  margin: 0 0 8px;
+  color: var(--text-heading);
+  font-size: 28px;
+}
+
+.png-export-header p {
+  margin: 0 0 4px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.png-export-header .png-export-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.png-export-root .table-wrap {
+  overflow: visible;
+  box-shadow: none;
 }

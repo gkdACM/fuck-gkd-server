@@ -4,6 +4,7 @@ const tableContainer = document.getElementById("tableContainer");
 const todaySchedule = document.getElementById("todaySchedule");
 const searchInput = document.getElementById("searchInput");
 const classSelect = document.getElementById("classSelect");
+const quickClassSelect = document.getElementById("quickClassSelect");
 const gradeSelect = document.getElementById("gradeSelect");
 const collegeSelect = document.getElementById("collegeSelect");
 const majorSelect = document.getElementById("majorSelect");
@@ -11,9 +12,14 @@ const classFilterInput = document.getElementById("classFilterInput");
 const weekFilterInput = document.getElementById("weekFilterInput");
 const weekNumberSelect = document.getElementById("weekNumberSelect");
 const weekModeSelect = document.getElementById("weekModeSelect");
+const jumpCurrentWeekBtn = document.getElementById("jumpCurrentWeekBtn");
+const favoriteClassBtn = document.getElementById("favoriteClassBtn");
+const copyShareLinkBtn = document.getElementById("copyShareLinkBtn");
+const exportPngBtn = document.getElementById("exportPngBtn");
 const compactToggle = document.getElementById("compactToggle");
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 const enableIcsToggle = document.getElementById("enableIcsToggle");
+const themeSelect = document.getElementById("themeSelect");
 const termStartInput = document.getElementById("termStartInput");
 const exportIcsBtn = document.getElementById("exportIcsBtn");
 const reloadButton = document.getElementById("reloadBtn");
@@ -78,6 +84,10 @@ const ATOMIC_PERIOD_TIME_RANGE = {
 
 const VIEW_STATE_STORAGE_KEY = "timetable_ui_state_v1";
 const LEGACY_TERM_START_STORAGE_KEY = "term_start_date";
+const FAVORITE_CLASSES_STORAGE_KEY = "favorite_class_ids_v1";
+const RECENT_CLASSES_STORAGE_KEY = "recent_class_ids_v1";
+const THEME_STORAGE_KEY = "timetable_theme_v1";
+const MAX_RECENT_CLASSES = 8;
 
 function parsePeriodRange(value, startHint = "", lengthHint = "") {
   const raw = String(value ?? "").trim();
@@ -203,6 +213,38 @@ function getSessionLabelForPeriod(periodText) {
   return "晚上";
 }
 
+function readStoredIdList(storageKey) {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(parsed.map((item) => String(item ?? "").trim()).filter(Boolean)),
+    );
+  } catch (error) {
+    console.warn(`read list failed: ${storageKey}`, error);
+    return [];
+  }
+}
+
+function writeStoredIdList(storageKey, values) {
+  try {
+    const normalized = Array.from(
+      new Set((values || []).map((item) => String(item ?? "").trim()).filter(Boolean)),
+    );
+    localStorage.setItem(storageKey, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn(`write list failed: ${storageKey}`, error);
+  }
+}
+
 const state = {
   dataset: null,
   legacyData: null,
@@ -222,7 +264,85 @@ const state = {
   lastRenderedRows: [],
   hasAppliedHashState: false,
   viewStateSource: "default",
+  favoriteClassIds: [],
+  recentClassIds: [],
+  lastVisitedClassId: "",
+  themePreference: "system",
+  colorSchemeMedia: null,
 };
+
+function hydrateClassMemoryState() {
+  state.favoriteClassIds = readStoredIdList(FAVORITE_CLASSES_STORAGE_KEY);
+  state.recentClassIds = readStoredIdList(RECENT_CLASSES_STORAGE_KEY);
+}
+
+function persistFavoriteClassIds() {
+  writeStoredIdList(FAVORITE_CLASSES_STORAGE_KEY, state.favoriteClassIds);
+}
+
+function persistRecentClassIds() {
+  writeStoredIdList(RECENT_CLASSES_STORAGE_KEY, state.recentClassIds);
+}
+
+function normalizeThemePreference(value) {
+  return value === "dark" || value === "light" || value === "system"
+    ? value
+    : "system";
+}
+
+function readStoredThemePreference() {
+  try {
+    return normalizeThemePreference(localStorage.getItem(THEME_STORAGE_KEY) || "system");
+  } catch (error) {
+    console.warn("read theme preference failed", error);
+    return "system";
+  }
+}
+
+function resolveTheme(preference) {
+  if (preference === "dark" || preference === "light") {
+    return preference;
+  }
+
+  const prefersDark = state.colorSchemeMedia
+    ? state.colorSchemeMedia.matches
+    : (window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)").matches : true);
+  return prefersDark ? "dark" : "light";
+}
+
+function applyThemePreference(preference, persist = false) {
+  const normalized = normalizeThemePreference(preference);
+  state.themePreference = normalized;
+
+  const appliedTheme = resolveTheme(normalized);
+  document.documentElement.dataset.themePreference = normalized;
+  document.documentElement.dataset.theme = appliedTheme;
+  themeSelect.value = normalized;
+
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, normalized);
+    } catch (error) {
+      console.warn("persist theme preference failed", error);
+    }
+  }
+}
+
+function initThemePreference() {
+  state.colorSchemeMedia = window.matchMedia
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+
+  applyThemePreference(readStoredThemePreference(), false);
+
+  if (state.colorSchemeMedia?.addEventListener) {
+    state.colorSchemeMedia.addEventListener("change", () => {
+      if (state.themePreference === "system") {
+        applyThemePreference("system", false);
+      }
+    });
+  }
+}
 
 // --- New Logic: Week Calculation ---
 function getWeekNumber(date, start) {
@@ -289,7 +409,7 @@ function formatDate(value) {
 
 function setStatus(text, isError = false) {
   statusNode.textContent = text;
-  statusNode.style.color = isError ? "#ff8c8c" : "#98afc7";
+  statusNode.style.color = isError ? "#ff8c8c" : "var(--text-secondary)";
   if (isError) {
     showToast(text, "error");
   }
@@ -696,14 +816,17 @@ function getTodayIndex() {
   return day === 0 ? 6 : day - 1;
 }
 
+function getTodayLabel() {
+  return DAYS[getTodayIndex()] || "";
+}
+
 function renderTodaySchedule(classItem, dataset, weekFilter) {
   if (!classItem || !dataset) {
     todaySchedule.classList.add("hidden");
     return;
   }
 
-  const todayIndex = getTodayIndex();
-  const todayLabel = DAYS[todayIndex];
+  const todayLabel = getTodayLabel();
 
   const todayItems = getVisibleMergedRows(classItem, "", weekFilter, todayLabel);
   if (!todayItems.length) {
@@ -1273,6 +1396,147 @@ function currentClass() {
   );
 }
 
+function findClassById(dataset, classId) {
+  if (!dataset || !classId) {
+    return null;
+  }
+
+  return dataset.classes.find((item) => item.id === classId) || null;
+}
+
+function isFavoriteClassId(classId) {
+  return Boolean(classId) && state.favoriteClassIds.includes(classId);
+}
+
+function renderQuickClassOptions(dataset = state.dataset) {
+  if (!quickClassSelect) {
+    return;
+  }
+
+  const classes = Array.isArray(dataset?.classes) ? dataset.classes : [];
+  const classMap = new Map(classes.map((item) => [item.id, item]));
+  const favoriteItems = state.favoriteClassIds.map((id) => classMap.get(id)).filter(Boolean);
+  const favoriteIds = new Set(favoriteItems.map((item) => item.id));
+  const recentItems = state.recentClassIds
+    .map((id) => classMap.get(id))
+    .filter((item) => item && !favoriteIds.has(item.id));
+
+  const options = ['<option value="">收藏 / 最近访问</option>'];
+  if (favoriteItems.length) {
+    options.push(
+      `<optgroup label="收藏班级">${favoriteItems
+        .map((item) => `<option value="${escapeHtml(item.id)}">★ ${escapeHtml(item.name)}</option>`)
+        .join("")}</optgroup>`,
+    );
+  }
+  if (recentItems.length) {
+    options.push(
+      `<optgroup label="最近访问">${recentItems
+        .map((item) => `<option value="${escapeHtml(item.id)}">🕘 ${escapeHtml(item.name)}</option>`)
+        .join("")}</optgroup>`,
+    );
+  }
+
+  quickClassSelect.innerHTML = options.join("");
+  quickClassSelect.value = "";
+  quickClassSelect.disabled = favoriteItems.length === 0 && recentItems.length === 0;
+}
+
+function renderFavoriteButtonState() {
+  if (!favoriteClassBtn) {
+    return;
+  }
+
+  const classItem = currentClass();
+  if (!state.dataset || !classItem) {
+    favoriteClassBtn.disabled = true;
+    favoriteClassBtn.textContent = "收藏当前班级";
+    favoriteClassBtn.classList.remove("is-active");
+    return;
+  }
+
+  const active = isFavoriteClassId(classItem.id);
+  favoriteClassBtn.disabled = false;
+  favoriteClassBtn.textContent = active ? "取消收藏当前班级" : "收藏当前班级";
+  favoriteClassBtn.classList.toggle("is-active", active);
+}
+
+function rememberRecentClass(classId) {
+  if (!classId) {
+    return;
+  }
+
+  state.recentClassIds = [classId, ...state.recentClassIds.filter((item) => item !== classId)]
+    .slice(0, MAX_RECENT_CLASSES);
+  persistRecentClassIds();
+}
+
+function activateClassById(classId) {
+  const dataset = state.dataset;
+  const classItem = findClassById(dataset, classId);
+  if (!dataset || !classItem) {
+    return false;
+  }
+
+  state.classFilterKeyword = "";
+  classFilterInput.value = "";
+  state.selectedGrade = classItem.grade || "";
+  state.selectedCollege = classItem.collegeCode || "";
+  state.selectedMajor = classItem.majorCode || "";
+  state.currentClassId = classItem.id;
+
+  renderClassOptions(dataset);
+  renderGridView();
+  scheduleHashSync();
+  return true;
+}
+
+function toggleFavoriteCurrentClass() {
+  const classItem = currentClass();
+  if (!classItem) {
+    setStatus("当前没有可收藏的班级", true);
+    return;
+  }
+
+  if (isFavoriteClassId(classItem.id)) {
+    state.favoriteClassIds = state.favoriteClassIds.filter((item) => item !== classItem.id);
+    persistFavoriteClassIds();
+    renderQuickClassOptions(state.dataset);
+    renderFavoriteButtonState();
+    showToast(`已取消收藏：${classItem.name}`, "info");
+    return;
+  }
+
+  state.favoriteClassIds = [classItem.id, ...state.favoriteClassIds.filter((item) => item !== classItem.id)];
+  persistFavoriteClassIds();
+  renderQuickClassOptions(state.dataset);
+  renderFavoriteButtonState();
+  showToast(`已收藏：${classItem.name}`, "success");
+}
+
+function jumpToCurrentWeek() {
+  if (!state.termStartDate) {
+    setStatus("请先填写开学周一，再跳到本周", true);
+    termStartInput.focus();
+    return;
+  }
+
+  const currentWeek = getWeekNumber(new Date(), state.termStartDate);
+  const maxWeek = state.dataset ? maxWeekInDataset(state.dataset) : 30;
+  if (!Number.isFinite(currentWeek) || currentWeek < 1 || currentWeek > maxWeek) {
+    setStatus(`当前日期不在有效学期周范围内（1-${maxWeek}周）`, true);
+    return;
+  }
+
+  state.selectedWeekNumber = String(currentWeek);
+  weekNumberSelect.value = state.selectedWeekNumber;
+  if (state.dataset) {
+    renderGridView();
+  }
+  scheduleHashSync();
+  showToast(`已定位到第${currentWeek}周`, "success");
+}
+
 function getVisibleMergedRows(classItem, keyword, weekFilter, dayLabel = "") {
   if (!classItem) {
     return [];
@@ -1319,8 +1583,14 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
   const groups = groupPeriods(periods);
   const cardRegistry = new Map();
   let cardCounter = 0;
+  const todayLabel = getTodayLabel();
 
-  const headerCells = DAYS.map((day) => `<th>${escapeHtml(day)}</th>`).join("");
+  const headerCells = DAYS
+    .map((day) => {
+      const todayClass = day === todayLabel ? "is-today-column" : "";
+      return `<th class="${todayClass}">${escapeHtml(day)}</th>`;
+    })
+    .join("");
   const rows = [];
 
   for (const group of groups) {
@@ -1335,14 +1605,15 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
       const dayCells = DAYS.map((day) => {
         const key = `${period.id}|${day}`;
         const slots = slotMap.get(key) || [];
+        const todayClass = day === todayLabel ? " is-today-column" : "";
 
         if (!slots.length) {
-          return '<td class="course-cell"><div class="empty-cell"></div></td>';
+          return `<td class="course-cell${todayClass}"><div class="empty-cell"></div></td>`;
         }
 
         const mergedSlots = mergeSlotsForDisplay(slots);
         if (!mergedSlots.length) {
-          return '<td class="course-cell"><div class="empty-cell"></div></td>';
+          return `<td class="course-cell${todayClass}"><div class="empty-cell"></div></td>`;
         }
 
         const registryKey = `cell-${cardCounter++}`;
@@ -1361,7 +1632,7 @@ function renderGridTable(classItem, periods, keyword, weekFilter) {
           ? `<button type="button" class="more-courses-btn" data-open-slot="${escapeHtml(registryKey)}">+${hiddenCount} 门课</button>`
           : "";
 
-        return `<td class="course-cell"><div class="course-stack">${cardsHtml}${moreButton}</div></td>`;
+        return `<td class="course-cell${todayClass}"><div class="course-stack">${cardsHtml}${moreButton}</div></td>`;
       }).join("");
 
       rows.push(`<tr>${sessionCell}${periodCell}${dayCells}</tr>`);
@@ -1510,7 +1781,14 @@ function renderGridView() {
     tableContainer.innerHTML = `<div class="empty">${escapeHtml(emptyText)}</div>`;
     state.cardRegistry = new Map();
     state.lastRenderedRows = [];
+    renderQuickClassOptions(dataset);
+    renderFavoriteButtonState();
     return;
+  }
+
+  if (state.lastVisitedClassId !== classItem.id) {
+    state.lastVisitedClassId = classItem.id;
+    rememberRecentClass(classItem.id);
   }
 
   const baseWeekFilter = parseWeekFilter(weekFilterInput.value, weekModeSelect.value);
@@ -1540,6 +1818,8 @@ function renderGridView() {
 
   document.body.classList.toggle("compact-mode", state.compactMode);
   refreshIcsAvailability(dataset);
+  renderQuickClassOptions(dataset);
+  renderFavoriteButtonState();
 }
 
 function toCsvField(value) {
@@ -1550,6 +1830,10 @@ function toCsvField(value) {
 
 function downloadFile(content, fileName, mimeType) {
   const blob = new Blob([content], { type: mimeType });
+  downloadBlob(blob, fileName);
+}
+
+function downloadBlob(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -1558,6 +1842,149 @@ function downloadFile(content, fileName, mimeType) {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const helper = document.createElement("textarea");
+  helper.value = text;
+  helper.setAttribute("readonly", "readonly");
+  helper.style.position = "fixed";
+  helper.style.opacity = "0";
+  document.body.appendChild(helper);
+  helper.select();
+  document.execCommand("copy");
+  helper.remove();
+}
+
+async function copyCurrentShareLink() {
+  writeHashStateNow();
+  writePersistedViewStateNow();
+
+  try {
+    await copyText(window.location.href);
+    setStatus("已复制分享链接", false);
+    showToast("已复制分享链接", "success");
+  } catch (error) {
+    console.error("copy share link failed", error);
+    setStatus("复制分享链接失败，请手动复制地址栏", true);
+  }
+}
+
+function buildExportSummaryText(classItem) {
+  const summary = [classItem?.name || ""];
+  if (state.selectedWeekNumber) {
+    summary.push(`第${state.selectedWeekNumber}周`);
+  }
+  if (weekModeSelect.value === "odd") {
+    summary.push("仅单周");
+  } else if (weekModeSelect.value === "even") {
+    summary.push("仅双周");
+  }
+  if (weekFilterInput.value.trim()) {
+    summary.push(`周次筛选：${weekFilterInput.value.trim()}`);
+  }
+  if (searchInput.value.trim()) {
+    summary.push(`搜索：${searchInput.value.trim()}`);
+  }
+  if (state.compactMode) {
+    summary.push("紧凑显示");
+  }
+  return summary.filter(Boolean).join(" ｜ ");
+}
+
+function buildPngExportNode(classItem) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "png-export-root";
+
+  const subtitle = buildExportSummaryText(classItem);
+  const generatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+  const tableClone = tableContainer.cloneNode(true);
+  tableClone.removeAttribute("id");
+
+  wrapper.innerHTML = `
+    <div class="png-export-panel">
+      <div class="png-export-header">
+        <h2>${escapeHtml(viewTitleNode.textContent || "班级课表")}</h2>
+        <p>${escapeHtml(subtitle)}</p>
+        <p class="png-export-meta">导出时间：${escapeHtml(generatedAt)}</p>
+      </div>
+    </div>
+  `;
+
+  wrapper.querySelector(".png-export-panel").appendChild(tableClone);
+  return wrapper;
+}
+
+async function exportCurrentPng() {
+  const classItem = currentClass();
+  if (!classItem) {
+    setStatus("导出失败：无可用班级", true);
+    return;
+  }
+
+  if (!tableContainer || !tableContainer.children.length) {
+    setStatus("导出失败：当前没有可导出的课表", true);
+    return;
+  }
+
+  if (typeof window.html2canvas !== "function") {
+    setStatus("导出失败：PNG 依赖未加载", true);
+    return;
+  }
+
+  showLoading();
+  const exportNode = buildPngExportNode(classItem);
+  document.body.appendChild(exportNode);
+
+  try {
+    await new Promise((resolve) => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(resolve);
+      });
+    });
+
+    const width = Math.ceil(exportNode.scrollWidth);
+    const height = Math.ceil(exportNode.scrollHeight);
+    const backgroundColor = getComputedStyle(document.documentElement)
+      .getPropertyValue("--png-export-bg")
+      .trim() || null;
+
+    const canvas = await window.html2canvas(exportNode, {
+      backgroundColor,
+      scale: Math.min(window.devicePixelRatio || 2, 2),
+      useCORS: true,
+      logging: false,
+      width,
+      height,
+      windowWidth: width,
+      windowHeight: height,
+      scrollX: 0,
+      scrollY: 0,
+    });
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, "image/png");
+    });
+    if (!blob) {
+      throw new Error("canvas toBlob failed");
+    }
+
+    const fileName = `${classItem.name.replaceAll(/\s+/g, "_")}_课表.png`;
+    downloadBlob(blob, fileName);
+    setStatus("已导出 PNG", false);
+    showToast("已导出 PNG", "success");
+  } catch (error) {
+    console.error("export PNG failed", error);
+    setStatus("导出 PNG 失败，请稍后重试", true);
+  } finally {
+    exportNode.remove();
+    hideLoading();
+  }
 }
 
 function exportCurrentCsv() {
@@ -2025,6 +2452,18 @@ classSelect.addEventListener("change", () => {
   scheduleHashSync();
 });
 
+quickClassSelect.addEventListener("change", () => {
+  const classId = quickClassSelect.value;
+  quickClassSelect.value = "";
+  if (!classId) {
+    return;
+  }
+
+  if (!activateClassById(classId)) {
+    setStatus("快捷班级跳转失败：未找到对应班级", true);
+  }
+});
+
 gradeSelect.addEventListener("change", () => {
   state.selectedGrade = gradeSelect.value;
   state.selectedCollege = "";
@@ -2076,6 +2515,10 @@ enableIcsToggle.addEventListener("change", () => {
   scheduleHashSync();
 });
 
+themeSelect.addEventListener("change", () => {
+  applyThemePreference(themeSelect.value, true);
+});
+
 termStartInput.addEventListener("change", () => {
   state.termStartDate = termStartInput.value;
   
@@ -2092,9 +2535,18 @@ termStartInput.addEventListener("change", () => {
 
 exportCsvBtn.addEventListener("click", exportCurrentCsv);
 exportIcsBtn.addEventListener("click", exportCurrentIcs);
+exportPngBtn.addEventListener("click", () => {
+  void exportCurrentPng();
+});
 
 reloadButton.addEventListener("click", () => {
   loadTimetable();
+});
+
+jumpCurrentWeekBtn.addEventListener("click", jumpToCurrentWeek);
+favoriteClassBtn.addEventListener("click", toggleFavoriteCurrentClass);
+copyShareLinkBtn.addEventListener("click", () => {
+  void copyCurrentShareLink();
 });
 
 window.addEventListener("hashchange", () => {
@@ -2106,5 +2558,7 @@ window.addEventListener("hashchange", () => {
   }
 });
 
+hydrateClassMemoryState();
+initThemePreference();
 applyHashStateToControls();
 loadTimetable();
