@@ -3,8 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
     <title>班级课表</title>
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <script>
+      (() => {
+        const key = "timetable_theme_v1";
+        let preference = "system";
+        try {
+          const stored = localStorage.getItem(key);
+          if (stored === "light" || stored === "dark" || stored === "system") {
+            preference = stored;
+          }
+        } catch (error) {
+          console.warn("read theme preference failed", error);
+        }
+
+        const prefersDark = window.matchMedia
+          ? window.matchMedia("(prefers-color-scheme: dark)").matches
+          : true;
+        const applied = preference === "system"
+          ? (prefersDark ? "dark" : "light")
+          : preference;
+
+        document.documentElement.dataset.themePreference = preference;
+        document.documentElement.dataset.theme = applied;
+      })();
+    </script>
+    <link rel="stylesheet" href="./styles.css?v=9" />
   </head>
   <body>
     <main class="container">
@@ -32,6 +57,13 @@
         <label class="control">
           <span>班级</span>
           <select id="classSelect"></select>
+        </label>
+
+        <label class="control">
+          <span>快捷班级</span>
+          <select id="quickClassSelect">
+            <option value="">收藏 / 最近访问</option>
+          </select>
         </label>
 
         <label class="control">
@@ -76,11 +108,24 @@
         </label>
 
         <label class="control">
+          <span>主题</span>
+          <select id="themeSelect">
+            <option value="system">跟随系统</option>
+            <option value="dark">深色</option>
+            <option value="light">浅色</option>
+          </select>
+        </label>
+
+        <label class="control">
           <span>开学周一</span>
           <input id="termStartInput" type="date" />
         </label>
 
         <div class="toolbar-actions">
+          <button id="jumpCurrentWeekBtn" type="button">跳到本周</button>
+          <button id="favoriteClassBtn" type="button">收藏当前班级</button>
+          <button id="copyShareLinkBtn" type="button">复制分享链接</button>
+          <button id="exportPngBtn" type="button">导出 PNG</button>
           <button id="exportCsvBtn" type="button">导出 CSV</button>
           <button id="exportIcsBtn" type="button" disabled>导出 ICS</button>
           <button id="reloadBtn" type="button">刷新数据</button>
@@ -111,6 +156,7 @@
       </div>
 
     </main>
-    <script src="./app.js" defer></script>
+    <script src="./vendor/html2canvas.min.js"></script>
+    <script src="./app.js?v=4" defer></script>
   </body>
 </html>
