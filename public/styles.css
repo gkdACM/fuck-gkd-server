@@ -443,6 +443,35 @@ button:disabled {
   font-size: 13px;
 }
 
+.course-card.compact {
+  min-height: 104px;
+  gap: 6px;
+}
+
+.course-card.compact .course-name {
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+}
+
+.course-card.compact .course-body {
+  gap: 3px;
+}
+
+.course-card.compact .meta-row {
+  font-size: 11px;
+}
+
+.course-card.compact .meta-row--period {
+  color: #dbeafe;
+  font-weight: 600;
+}
+
+.course-card.compact .meta-row span {
+  display: block;
+  min-width: 0;
+}
+
 /* Today Schedule Styles */
 .today-schedule {
   margin-bottom: 20px;
@@ -904,4 +933,33 @@ button:disabled {
     width: 100%;
     min-width: 0;
   }
+}
+
+.course-card.compact {
+  min-height: 104px;
+  gap: 6px;
+}
+
+.course-card.compact .course-name {
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-line-clamp: 2;
+}
+
+.course-card.compact .course-body {
+  gap: 3px;
+}
+
+.course-card.compact .meta-row {
+  font-size: 11px;
+}
+
+.course-card.compact .meta-row--period {
+  color: #dbeafe;
+  font-weight: 600;
+}
+
+.course-card.compact .meta-row span {
+  display: block;
+  min-width: 0;
 }

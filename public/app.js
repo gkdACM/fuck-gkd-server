@@ -76,6 +76,9 @@ const ATOMIC_PERIOD_TIME_RANGE = {
   11: { start: "20:50", end: "21:35" },
 };
 
+const VIEW_STATE_STORAGE_KEY = "timetable_ui_state_v1";
+const LEGACY_TERM_START_STORAGE_KEY = "term_start_date";
+
 function parsePeriodRange(value, startHint = "", lengthHint = "") {
   const raw = String(value ?? "").trim();
   const numbers = (raw.match(/\d+/g) || []).map((item) => Number.parseInt(item, 10));
@@ -218,6 +221,7 @@ const state = {
   cardRegistry: new Map(),
   lastRenderedRows: [],
   hasAppliedHashState: false,
+  viewStateSource: "default",
 };
 
 // --- New Logic: Week Calculation ---
@@ -244,24 +248,16 @@ function getWeekNumber(date, start) {
 }
 
 function autoSelectCurrentWeek() {
-  // Priority: 
-  // 1. Hash param 'wn' (Already handled by applyHashStateToControls)
-  // 2. Local Storage Override (User manually set a preference? Maybe not needed if we rely on start date)
-  // 3. Auto-calc based on termStartDate
-  
-  // If a specific week is already selected via Hash, respect it.
-  const hashState = getHashState();
-  if (hashState.wn) {
+  if (hasHashParams() || state.viewStateSource !== "default" || state.selectedWeekNumber) {
     return;
   }
   
-  // Try to use localStorage term start date if state is empty
   if (!state.termStartDate) {
-     const storedStart = localStorage.getItem("term_start_date");
-     if (storedStart) {
-       state.termStartDate = storedStart;
-       termStartInput.value = storedStart;
-     }
+    const storedStart = getStoredTermStartDate();
+    if (storedStart) {
+      state.termStartDate = storedStart;
+      termStartInput.value = storedStart;
+    }
   }
 
   if (!state.termStartDate) {
@@ -354,27 +350,131 @@ function getHashState() {
   };
 }
 
-function applyHashStateToControls() {
-  const hashState = getHashState();
-  searchInput.value = hashState.q;
-  classFilterInput.value = hashState.cf;
-  weekFilterInput.value = hashState.wf;
-  weekModeSelect.value = hashState.wm === "odd" || hashState.wm === "even" ? hashState.wm : "all";
-  weekNumberSelect.value = hashState.wn;
-  compactToggle.checked = hashState.cp !== "0";
-  enableIcsToggle.checked = hashState.ei === "1";
-  termStartInput.value = hashState.ts;
+function hasHashParams() {
+  const raw = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  return Boolean(raw);
+}
 
-  state.classFilterKeyword = hashState.cf;
-  state.selectedWeekNumber = hashState.wn;
-  state.currentClassId = hashState.c;
-  state.selectedGrade = hashState.g;
-  state.selectedCollege = hashState.co;
-  state.selectedMajor = hashState.m;
+function normalizeViewState(raw = {}) {
+  return {
+    q: String(raw.q ?? ""),
+    cf: String(raw.cf ?? ""),
+    wf: String(raw.wf ?? ""),
+    wm: raw.wm === "odd" || raw.wm === "even" ? raw.wm : "all",
+    wn: String(raw.wn ?? ""),
+    c: String(raw.c ?? ""),
+    g: String(raw.g ?? ""),
+    co: String(raw.co ?? ""),
+    m: String(raw.m ?? ""),
+    cp: raw.cp === "1" ? "1" : "0",
+    ei: raw.ei === "1" ? "1" : "0",
+    ts: String(raw.ts ?? ""),
+  };
+}
+
+function readPersistedViewState() {
+  try {
+    const raw = localStorage.getItem(VIEW_STATE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return normalizeViewState(JSON.parse(raw));
+  } catch (error) {
+    console.warn("read persisted view state failed", error);
+    return null;
+  }
+}
+
+function getStoredTermStartDate() {
+  const persisted = readPersistedViewState();
+  if (persisted?.ts) {
+    return persisted.ts;
+  }
+  return localStorage.getItem(LEGACY_TERM_START_STORAGE_KEY) || "";
+}
+
+function getInitialViewState() {
+  if (hasHashParams()) {
+    return {
+      source: "hash",
+      values: normalizeViewState(getHashState()),
+    };
+  }
+
+  const persisted = readPersistedViewState();
+  if (persisted) {
+    return {
+      source: "storage",
+      values: persisted,
+    };
+  }
+
+  return {
+    source: "default",
+    values: normalizeViewState({
+      ts: localStorage.getItem(LEGACY_TERM_START_STORAGE_KEY) || "",
+    }),
+  };
+}
+
+function getCurrentViewState() {
+  return normalizeViewState({
+    q: searchInput.value.trim(),
+    cf: state.classFilterKeyword.trim(),
+    wf: weekFilterInput.value.trim(),
+    wm: weekModeSelect.value,
+    wn: state.selectedWeekNumber,
+    c: state.currentClassId,
+    g: state.selectedGrade,
+    co: state.selectedCollege,
+    m: state.selectedMajor,
+    cp: state.compactMode ? "1" : "0",
+    ei: state.enableIcs ? "1" : "0",
+    ts: state.termStartDate,
+  });
+}
+
+function writePersistedViewStateNow() {
+  try {
+    const next = getCurrentViewState();
+    localStorage.setItem(VIEW_STATE_STORAGE_KEY, JSON.stringify(next));
+    if (next.ts) {
+      localStorage.setItem(LEGACY_TERM_START_STORAGE_KEY, next.ts);
+    } else {
+      localStorage.removeItem(LEGACY_TERM_START_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("persist view state failed", error);
+  }
+}
+
+function applyHashStateToControls() {
+  const initialState = getInitialViewState();
+  const values = initialState.values;
+
+  searchInput.value = values.q;
+  classFilterInput.value = values.cf;
+  weekFilterInput.value = values.wf;
+  weekModeSelect.value = values.wm;
+  weekNumberSelect.value = values.wn;
+  compactToggle.checked = values.cp === "1";
+  enableIcsToggle.checked = values.ei === "1";
+  termStartInput.value = values.ts;
+
+  state.classFilterKeyword = values.cf;
+  state.selectedWeekNumber = values.wn;
+  state.currentClassId = values.c;
+  state.selectedGrade = values.g;
+  state.selectedCollege = values.co;
+  state.selectedMajor = values.m;
   state.compactMode = compactToggle.checked;
   state.enableIcs = enableIcsToggle.checked;
-  state.termStartDate = hashState.ts;
+  state.termStartDate = values.ts;
   state.hasAppliedHashState = true;
+  state.viewStateSource = initialState.source;
+  writePersistedViewStateNow();
 }
 
 function writeHashStateNow() {
@@ -416,6 +516,7 @@ function scheduleHashSync() {
   state.hashDebounceTimer = window.setTimeout(() => {
     state.hashDebounceTimer = null;
     writeHashStateNow();
+    writePersistedViewStateNow();
   }, 160);
 }
 
@@ -574,6 +675,7 @@ function groupPeriods(periods) {
 }
 
 const ICONS = {
+  period: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 15"></polyline></svg>`,
   location: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
   teacher: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
   weeks: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
@@ -651,31 +753,53 @@ function renderCourseCard(slot, registryKey) {
     ? `[${escapeHtml(slot.courseCode)}]`
     : "";
   const periodText = slot.period ? ` · ${escapeHtml(slot.period)}` : "";
+  const weeksText = slot.weeks ? ` · ${escapeHtml(slot.weeks)}` : "";
+  const periodSummary = slot.period
+    ? [slot.period, getSessionLabelForPeriod(slot.period)].filter(Boolean).join(" · ")
+    : "";
   
   const compactClass = state.compactMode ? "course-card compact" : "course-card";
   const bgColor = getCourseColor(slot.courseName);
+  const courseMetaHtml = state.compactMode
+    ? `
+      ${periodSummary ? `
+        <div class="meta-row meta-row--period" title="节次">
+          ${ICONS.period}
+          <span>${escapeHtml(periodSummary)}</span>
+        </div>
+      ` : ""}
+      <div class="meta-row" title="教师">
+        ${ICONS.teacher}
+        <span>${escapeHtml(slot.teacher || "待定")}</span>
+      </div>
+      <div class="meta-row" title="地点">
+        ${ICONS.location}
+        <span>${escapeHtml(slot.location || "待定")}</span>
+      </div>
+    `
+    : `
+      <div class="meta-row" title="地点">
+        ${ICONS.location}
+        <span>${escapeHtml(slot.location || "待定")}</span>
+      </div>
+      <div class="meta-row" title="教师">
+        ${ICONS.teacher}
+        <span>${escapeHtml(slot.teacher || "待定")}</span>
+      </div>
+      <div class="meta-row meta-row--weeks" title="周次">
+        ${ICONS.weeks}
+        <span>${escapeHtml(slot.weeks || "")}</span>
+      </div>
+    `;
   
-  // New layout: Name (primary) takes full width. Code moved to title.
-  // We hide the code in the card to save space, but keep it in the title attribute.
   return `
-    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};" title="${escapeHtml(slot.courseName)} ${codeText}${periodText}">
+    <button type="button" class="${compactClass}" data-open-slot="${escapeHtml(registryKey)}" style="border-left: 3px solid ${bgColor};" title="${escapeHtml(slot.courseName)} ${codeText}${periodText}${weeksText}">
       <div class="course-header">
         <span class="course-name">${escapeHtml(slot.courseName)}</span>
       </div>
       
       <div class="course-body">
-        <div class="meta-row" title="地点">
-          ${ICONS.location}
-          <span>${escapeHtml(slot.location || "待定")}</span>
-        </div>
-        <div class="meta-row" title="教师">
-          ${ICONS.teacher}
-          <span>${escapeHtml(slot.teacher || "待定")}</span>
-        </div>
-        <div class="meta-row" title="周次">
-          ${ICONS.weeks}
-          <span>${escapeHtml(slot.weeks || "")}</span>
-        </div>
+        ${courseMetaHtml}
       </div>
     </button>
   `;
@@ -1686,7 +1810,7 @@ async function loadTimetable() {
   setStatus("正在加载课表...");
 
   // Load user preference for term start date first
-  const storedStart = localStorage.getItem("term_start_date");
+  const storedStart = getStoredTermStartDate();
   if (storedStart) {
     state.termStartDate = storedStart;
     termStartInput.value = storedStart;
@@ -1954,15 +2078,7 @@ enableIcsToggle.addEventListener("change", () => {
 
 termStartInput.addEventListener("change", () => {
   state.termStartDate = termStartInput.value;
-  if (state.termStartDate) {
-    localStorage.setItem("term_start_date", state.termStartDate);
-  } else {
-    localStorage.removeItem("term_start_date");
-  }
   
-  // If the user sets the start date, we should probably auto-select the current week
-  // unless they specifically chose another week in the filter? 
-  // Let's just update the week number if none is currently locked by hash.
   if (!getHashState().wn) {
     autoSelectCurrentWeek();
     if (state.dataset) {
