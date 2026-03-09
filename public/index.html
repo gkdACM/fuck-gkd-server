@@ -29,7 +29,8 @@
         document.documentElement.dataset.theme = applied;
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=9" />
+    <link rel="stylesheet" href="./styles.css?v=10" />
+    <link rel="manifest" href="./manifest.json" />
   </head>
   <body>
     <main class="container">
@@ -157,6 +158,11 @@
 
     </main>
     <script src="./vendor/html2canvas.min.js"></script>
-    <script src="./app.js?v=4" defer></script>
+    <script type="module" src="./js/main.js?v=5"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
+    </script>
   </body>
 </html>
